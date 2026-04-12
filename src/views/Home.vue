@@ -16,7 +16,7 @@
               'bg-red-500': backendOnline === false,
               'bg-yellow-500': backendOnline === null
             }"></span>
-            <span class="text-zinc-500 dark:text-zinc-400">
+            <span class="text-xs text-zinc-400 dark:text-zinc-500">
               {{ backendOnline === true ? '后端已连接' : backendOnline === false ? '后端未连接' : '连接中...' }}
             </span>
           </div>
@@ -845,11 +845,14 @@ async function handleLoadModel(modelName: string) {
   }
 }
 
-function handleHistoryClick(item: any) {
+async function handleHistoryClick(item: any) {
   currentAudioBlob.value = null
   success.value = false
   selectedArticle.value = null
   loadingFromHistory.value = true
+  newsType.value = 'newspaper'
+  
+  await nextTick()
   
   let audioId = ''
   if (item.versions && item.versions.length > 0) {
