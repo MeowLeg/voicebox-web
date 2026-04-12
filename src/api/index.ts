@@ -1,4 +1,5 @@
-const PROXY = '/api/v1'
+const API_BASE = '/voicebox-web'
+// const API_BASE = 'http://61.153.213.238:17493'  // 直接访问后端（仅开发调试用）
 
 export interface VoiceProfile {
   id: string
@@ -35,58 +36,6 @@ export interface GenerationResponse {
   active_version_id?: string
 }
 
-export async function fetchProfiles(signal?: AbortSignal): Promise<VoiceProfile[]> {
-  const res = await fetch(`${PROXY}?path=profiles`, { signal })
-  if (!res.ok) throw new Error('Failed to fetch profiles')
-  return res.json()
-}
-
-export interface CreateProfileRequest {
-  name: string
-  description?: string
-  language?: string
-  voice_type?: 'cloned' | 'preset' | 'designed'
-  preset_engine?: string
-  preset_voice_id?: string
-  design_prompt?: string
-  default_engine?: string
-}
-
-export async function createProfile(req: CreateProfileRequest): Promise<VoiceProfile> {
-  const res = await fetch(`${PROXY}?path=profiles`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-  })
-  if (!res.ok) {
-    const error = await res.text()
-    throw new Error(error || 'Failed to create profile')
-  }
-  return res.json()
-}
-
-export async function generateSpeech(req: GenerationRequest, signal?: AbortSignal): Promise<GenerationResponse> {
-  const res = await fetch(`${PROXY}?path=generate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(req),
-    signal,
-  })
-  if (!res.ok) {
-    const error = await res.text()
-    throw new Error(error || 'Generation failed')
-  }
-  const data = await res.json()
-  console.log('generateSpeech response:', data)
-  return data
-}
-
-export async function getGenerationStatus(id: string): Promise<GenerationResponse> {
-  const res = await fetch(`${PROXY}?path=generate/${id}/status`)
-  if (!res.ok) throw new Error('Failed to get status')
-  return res.json()
-}
-
 export interface HistoryItem {
   id: string
   profile_id: string
@@ -106,20 +55,6 @@ export interface HistoryItem {
   active_version_id?: string
 }
 
-export async function fetchHistory(limit = 50): Promise<HistoryItem[]> {
-  const res = await fetch(`${PROXY}?path=history?limit=${limit}`)
-  if (!res.ok) throw new Error('Failed to fetch history')
-  const data = await res.json()
-  return data.items || []
-}
-
-export async function deleteHistoryItem(id: string): Promise<void> {
-  const res = await fetch(`${PROXY}?path=history/${id}`, {
-    method: 'DELETE',
-  })
-  if (!res.ok) throw new Error('Failed to delete history item')
-}
-
 export interface ModelInfo {
   model_name: string
   display_name: string
@@ -130,34 +65,137 @@ export interface ModelInfo {
   loaded: boolean
 }
 
+export async function fetchProfiles(signal?: AbortSignal): Promise<VoiceProfile[]> {
+  const res = await fetch(`${API_BASE}/profiles`, { signal })
+  if (!res.ok) throw new Error('Failed to fetch profiles')
+  return res.json()
+}
+
+export async function createProfile(data: {
+  name: string
+  description?: string
+  language?: string
+  voice_type?: 'cloned' | 'preset' | 'designed'
+  preset_engine?: string
+  preset_voice_id?: string
+}): Promise<VoiceProfile> {
+  const res = await fetch(`${API_BASE}/profiles`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  })
+  if (!res.ok) {
+    const error = await res.text()
+    throw new Error(error || 'Failed to create profile')
+  }
+  return res.json()
+}
+
+export async function deleteProfile(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/profiles/${id}`, {
+    method: 'DELETE'
+  })
+  if (!res.ok) {
+    const error = await res.text()
+    throw new Error(error || 'Failed to delete profile')
+  }
+}
+
+export async function uploadProfileSample(
+  profileId: string,
+  audioBlob: Blob,
+  referenceText: string
+): Promise<void> {
+  const formData = new FormData()
+  formData.append('file', audioBlob, 'sample.wav')
+  formData.append('reference_text', referenceText)
+  
+  const res = await fetch(`${API_BASE}/profiles/${profileId}/samples`, {
+    method: 'POST',
+    body: formData
+  })
+  if (!res.ok) {
+    const error = await res.text()
+    throw new Error(error || 'Failed to upload sample')
+  }
+}
+
+export async function generateSpeech(
+  req: GenerationRequest,
+  signal?: AbortSignal
+): Promise<GenerationResponse> {
+  const res = await fetch(`${API_BASE}/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+    signal
+  })
+  if (!res.ok) {
+    const error = await res.text()
+    throw new Error(error || 'Generation failed')
+  }
+  const text = await res.text()
+  let cleanText = text.replace(/^data:\s*/, '').trim()
+  cleanText = cleanText.split('\n')[0].trim()
+  return JSON.parse(cleanText)
+}
+
+export async function getGenerationStatus(id: string): Promise<GenerationResponse> {
+  const res = await fetch(`${API_BASE}/generate/${id}/status`)
+  if (!res.ok) throw new Error('Failed to get status')
+  const text = await res.text()
+  let cleanText = text.replace(/^data:\s*/, '').trim()
+  cleanText = cleanText.split('\n')[0].trim()
+  return JSON.parse(cleanText)
+}
+
+export async function fetchHistory(limit = 50): Promise<HistoryItem[]> {
+  const res = await fetch(`${API_BASE}/history?limit=${limit}`)
+  if (!res.ok) throw new Error('Failed to fetch history')
+  const data = await res.json()
+  return data.items || []
+}
+
+export async function deleteHistoryItem(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/history/${id}`, {
+    method: 'DELETE'
+  })
+  if (!res.ok) throw new Error('Failed to delete history item')
+}
+
 export async function fetchModels(): Promise<ModelInfo[]> {
-  const res = await fetch(`${PROXY}?path=models/status`)
+  const res = await fetch(`${API_BASE}/models/status`)
   if (!res.ok) throw new Error('Failed to fetch models')
   const data = await res.json()
   return data.models || []
 }
 
 export async function downloadModel(modelName: string): Promise<void> {
-  const res = await fetch(`${PROXY}?path=models/download`, {
+  const res = await fetch(`${API_BASE}/models/download`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model_name: modelName }),
+    body: JSON.stringify({ model_name: modelName })
   })
   if (!res.ok) throw new Error('Failed to download model')
 }
 
 export async function loadModel(modelSize: string): Promise<void> {
-  const res = await fetch(`${PROXY}?path=models/load?model_size=${modelSize}`, {
-    method: 'POST',
+  const res = await fetch(`${API_BASE}/models/load?model_size=${modelSize}`, {
+    method: 'POST'
   })
   if (!res.ok) throw new Error('Failed to load model')
 }
 
 export function getAudioUrl(id: string): string {
-  return `/api/audio/${id}`
+  return `${API_BASE}/audio/${id}`
 }
 
-export async function waitForCompletion(id: string, intervalMs = 1000, maxAttempts = 300, signal?: AbortSignal): Promise<GenerationResponse> {
+export async function waitForCompletion(
+  id: string,
+  intervalMs = 1000,
+  maxAttempts = 300,
+  signal?: AbortSignal
+): Promise<GenerationResponse> {
   for (let i = 0; i < maxAttempts; i++) {
     signal?.throwIfAborted()
     const status = await getGenerationStatus(id)
@@ -201,6 +239,10 @@ export function splitText(text: string, maxLen = 500): string[] {
 
 function readUint32(view: DataView, offset: number): number {
   return view.getUint32(offset, true)
+}
+
+function readUint16(view: DataView, offset: number): number {
+  return view.getUint16(offset, true)
 }
 
 function writeUint32(view: DataView, offset: number, value: number): void {
@@ -248,7 +290,6 @@ export async function concatWavBlobs(blobs: Blob[]): Promise<Blob> {
           }
           
           if (dataSize === 0 || dataOffset === 0) {
-            console.error(`Chunk ${i}: No data chunk found, using fallback`)
             dataOffset = 44
             dataSize = buffer.byteLength - 44
           }
@@ -290,6 +331,59 @@ export async function concatWavBlobs(blobs: Blob[]): Promise<Blob> {
   })
 }
 
-function readUint16(view: DataView, offset: number): number {
-  return view.getUint16(offset, true)
+// Article API
+export interface Article {
+  AUTHOR: string
+  CHNLDESC: string
+  DOCSTATUS: number
+  DOCTYPE: number
+  METADATAID: number
+  PUBDATE: string
+  TITLE: string
+}
+
+export async function fetchPaperArticles(params: {
+  siteId: string
+  docstatus: string
+  beginDate?: string
+  endDate?: string
+}): Promise<Article[]> {
+  const query = new URLSearchParams()
+  query.set('siteId', params.siteId)
+  query.set('docstatus', params.docstatus)
+  if (params.beginDate) query.set('beginDate', params.beginDate)
+  if (params.endDate) query.set('endDate', params.endDate)
+  
+  const res = await fetch(`${API_BASE}/articles/get_paper_articles?${query.toString()}`)
+  if (!res.ok) throw new Error('Failed to fetch articles')
+  const json = await res.json()
+  return json.data || []
+}
+
+export async function fetchArticleDetail(metadataId: string): Promise<any> {
+  const url = `${API_BASE}/articles/get_paper_article_detail?metadataId=${metadataId}`
+  console.log('Fetching article detail from:', url)
+  const res = await fetch(url)
+  console.log('Response status:', res.status)
+  const json = await res.json()
+  console.log('Response data:', json)
+  return json
+}
+
+export async function fetchTvNewsLists(startTime: string, endTime: string, columnId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/articles/get_tv_newslists?startTime=${startTime}&endTime=${endTime}&columnId=${columnId}`)
+  if (!res.ok) throw new Error('Failed to fetch TV news lists')
+  return res.json()
+}
+
+export async function fetchTvNewsDetail(listId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/articles/get_tv_newslist_detail?llistid=${listId}`)
+  if (!res.ok) throw new Error('Failed to fetch TV news detail')
+  return res.json()
+}
+
+export async function fetchTvArticle(docId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/articles/get_tv_article?docid=${docId}`)
+  if (!res.ok) throw new Error('Failed to fetch TV article')
+  return res.json()
 }
