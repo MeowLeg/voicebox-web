@@ -287,7 +287,7 @@
               >
                 <div class="truncate">{{ item.text }}</div>
                 <div class="flex items-center gap-2 text-zinc-400 mt-1">
-                  <span>{{ new Date(item.created_at).toLocaleString() }}</span>
+                  <span>{{ new Date(item.created_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) }}</span>
                   <span v-if="item.duration" class="text-blue-500">{{ item.duration.toFixed(1) }}s</span>
                   <span v-if="item.status === 'failed'" class="text-red-500">失败</span>
                 </div>
