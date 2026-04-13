@@ -24,8 +24,37 @@
       </div>
     </header>
 
+    <!-- 标签页导航 -->
+    <div class="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+      <div class="max-w-7xl mx-auto px-6">
+        <div class="flex gap-1">
+          <button
+            @click="activeTab = 'generate'"
+            :class="['px-6 py-3 text-sm font-medium transition-colors',
+              activeTab === 'generate' 
+                ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400' 
+                : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200']"
+          >
+            新闻生成
+          </button>
+          <button
+            @click="activeTab = 'history'"
+            :class="['px-6 py-3 text-sm font-medium transition-colors',
+              activeTab === 'history' 
+                ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400' 
+                : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200']"
+          >
+            历史记录
+          </button>
+        </div>
+      </div>
+    </div>
+
     <main class="flex-1 max-w-7xl w-full mx-auto px-6 py-6">
-      <div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 flex overflow-hidden" style="height: calc(100vh - 120px)">
+      <!-- 新闻生成标签页 -->
+      <div v-show="activeTab === 'generate'">
+
+        <div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 flex overflow-hidden" style="height: calc(100vh - 180px)">
         
         <!-- 左侧：文章选择 -->
         <div class="w-72 shrink-0 border-r border-zinc-200 dark:border-zinc-800 p-4 flex flex-col">
@@ -268,39 +297,75 @@
             </span>
           </div>
         </div>
+      </div>
+      </div>
 
-        <!-- 右侧：历史记录 -->
-        <div class="w-72 shrink-0 border-l border-zinc-200 dark:border-zinc-800 p-4 flex flex-col">
-          <h2 class="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide shrink-0">历史记录</h2>
-          <div class="flex-1 overflow-y-auto mt-2 space-y-2">
-            <div v-if="historyLoading" class="text-sm text-zinc-400 text-center py-4">加载中...</div>
-            <div v-else-if="history.length === 0" class="text-sm text-zinc-400 text-center py-4">暂无记录</div>
-            <div
-              v-else
-              v-for="item in history"
-              :key="item.id"
-              class="relative p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 text-xs group"
-            >
-              <div
-                class="cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded p-1 -m-1"
-                @click="handleHistoryClick(item)"
-              >
-                <div class="truncate">{{ item.text }}</div>
-                <div class="flex items-center gap-2 text-zinc-400 mt-1">
+      <!-- 历史记录标签页 -->
+      <div v-show="activeTab === 'history'" class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-6" style="height: calc(100vh - 180px)">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold">历史记录</h2>
+          <div class="text-sm text-zinc-400">共 {{ history.length }} 条记录</div>
+        </div>
+        <div class="h-full overflow-y-auto space-y-3">
+          <div v-if="historyLoading" class="text-center py-12 text-zinc-400">加载中...</div>
+          <div v-else-if="history.length === 0" class="text-center py-12 text-zinc-400">暂无记录</div>
+          <div
+            v-else
+            v-for="item in history"
+            :key="item.id"
+            class="p-4 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800"
+          >
+            <div class="flex items-start gap-3">
+              <div class="flex-1 min-w-0">
+                <div 
+                  class="text-sm mb-2"
+                  :class="{ 'line-clamp-3': !item.expanded }"
+                >
+                  {{ item.text }}
+                </div>
+                <button
+                  v-if="item.text.length > 100"
+                  @click="item.expanded = !item.expanded"
+                  class="text-xs text-blue-500 hover:text-blue-600"
+                >
+                  {{ item.expanded ? '收起' : '展开' }}
+                </button>
+                <div class="flex items-center gap-3 text-xs text-zinc-400">
                   <span>{{ new Date(new Date(item.created_at).getTime() + 8 * 60 * 60 * 1000).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) }}</span>
                   <span v-if="item.duration" class="text-blue-500">{{ item.duration.toFixed(1) }}s</span>
                   <span v-if="item.status === 'failed'" class="text-red-500">失败</span>
+                  <span v-else-if="item.status === 'completed'" class="text-green-500">成功</span>
+                </div>
+                
+                <!-- 音频播放器 -->
+                <div v-if="item.status === 'completed' && getHistoryAudioUrl(item)" class="mt-3">
+                  <audio :src="getHistoryAudioUrl(item)" controls class="w-full"></audio>
                 </div>
               </div>
-              <button
-                @click.stop="confirmDeleteHistory(item)"
-                class="absolute top-1 right-1 p-1 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity"
-                title="删除"
-              >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-              </button>
+              
+              <!-- 操作按钮 -->
+              <div class="flex flex-col gap-2">
+                <a
+                  v-if="item.status === 'completed' && getHistoryAudioUrl(item)"
+                  :href="getHistoryAudioUrl(item)"
+                  download
+                  class="p-2 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 text-green-600 dark:text-green-400"
+                  title="下载"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                  </svg>
+                </a>
+                <button
+                  @click="confirmDeleteHistory(item)"
+                  class="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400"
+                  title="删除"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -467,6 +532,7 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { fetchProfiles, generateSpeech, getGenerationStatus, fetchHistory, fetchModels, downloadModel, loadModel, createProfile, uploadProfileSample, deleteProfile, deleteHistoryItem } from '@/api'
 import { fetchPaperArticles, fetchTvNewsLists, fetchTvNewsDetail, fetchTvArticle, fetchArticleDetail } from '@/api'
 
+const activeTab = ref<'generate' | 'history'>('generate')
 const newsType = ref<'newspaper' | 'tv'>('newspaper')
 const articles = ref<any[]>([])
 const articlesLoading = ref(false)
@@ -777,7 +843,11 @@ function createWavBlob(chunks: Float32Array[], sampleRate: number): Blob {
 async function loadHistory() {
   try {
     historyLoading.value = true
-    history.value = await fetchHistory()
+    const data = await fetchHistory()
+    history.value = data.map((item: any) => ({
+      ...item,
+      expanded: false
+    }))
   } catch (err) {
     console.error('Failed to load history:', err)
   } finally {
@@ -845,7 +915,19 @@ async function handleLoadModel(modelName: string) {
   }
 }
 
+function getHistoryAudioUrl(item: any): string | null {
+  let audioId = ''
+  if (item.versions && item.versions.length > 0) {
+    const defaultVersion = item.versions.find((v: any) => v.is_default) || item.versions[0]
+    audioId = defaultVersion.audio_path.split('/').pop()?.replace('.wav', '') || ''
+  } else if (item.audio_path) {
+    audioId = item.audio_path.split('/').pop()?.replace('.wav', '') || ''
+  }
+  return audioId ? `/voicebox-web/audio/${audioId}` : null
+}
+
 async function handleHistoryClick(item: any) {
+  activeTab.value = 'generate'
   currentAudioBlob.value = null
   success.value = false
   selectedArticle.value = null
@@ -854,25 +936,18 @@ async function handleHistoryClick(item: any) {
   
   await nextTick()
   
-  let audioId = ''
-  if (item.versions && item.versions.length > 0) {
-    const defaultVersion = item.versions.find((v: any) => v.is_default) || item.versions[0]
-    audioId = defaultVersion.audio_path.split('/').pop()?.replace('.wav', '') || ''
-  } else if (item.audio_path) {
-    audioId = item.audio_path.split('/').pop()?.replace('.wav', '') || ''
-  }
-  
-  if (audioId) {
-    currentAudio.value = `/voicebox-web/audio/${audioId}`
-    text.value = item.text
-    tvParagraphs.value = []
-    nextTick(() => {
-      loadingFromHistory.value = false
-    })
+  const audioUrl = getHistoryAudioUrl(item)
+  if (audioUrl) {
+    currentAudio.value = audioUrl
   } else {
     currentAudio.value = null
-    loadingFromHistory.value = false
   }
+  
+  text.value = item.text
+  tvParagraphs.value = []
+  nextTick(() => {
+    loadingFromHistory.value = false
+  })
 }
 
 async function checkBackend() {
