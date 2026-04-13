@@ -17,6 +17,7 @@ export interface GenerationRequest {
   model_size?: string
   instruct?: string
   engine?: string
+  max_chunk_chars?: number
 }
 
 export interface GenerationResponse {
@@ -157,10 +158,33 @@ export async function fetchHistory(limit = 50): Promise<HistoryItem[]> {
 }
 
 export async function deleteHistoryItem(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/history/${id}`, {
-    method: 'DELETE'
-  })
-  if (!res.ok) throw new Error('Failed to delete history item')
+  const url = `${API_BASE}/history/${id}`
+  
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 10000)
+  
+  try {
+    const res = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      signal: controller.signal
+    })
+    
+    clearTimeout(timeoutId)
+    
+    if (!res.ok) {
+      const errorText = await res.text()
+      throw new Error(`删除失败 (${res.status}): ${errorText || '未知错误'}`)
+    }
+  } catch (err: any) {
+    clearTimeout(timeoutId)
+    if (err.name === 'AbortError') {
+      throw new Error('删除请求超时，请检查后端是否在线')
+    }
+    throw err
+  }
 }
 
 export async function fetchModels(): Promise<ModelInfo[]> {

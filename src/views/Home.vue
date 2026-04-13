@@ -242,21 +242,32 @@
               <span v-if="loadingModel" class="text-xs text-blue-500">加载中...</span>
             </div>
 
-            <div class="flex items-center gap-2">
-              <label class="text-zinc-500 dark:text-zinc-400">语调:</label>
-              <select
-                v-model="tone"
-                class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">正常</option>
-                <option value="播音腔">播音腔</option>
-                <option value="新闻播报">新闻播报</option>
-                <option value="讲故事">讲故事</option>
-                <option value="激动">激动</option>
-                <option value="舒缓">舒缓</option>
-              </select>
-            </div>
-          </div>
+             <div class="flex items-center gap-2">
+               <label class="text-zinc-500 dark:text-zinc-400">语调:</label>
+               <select
+                 v-model="tone"
+                 class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+               >
+                 <option value="">正常</option>
+                 <option value="播音腔">播音腔</option>
+                 <option value="新闻播报">新闻播报</option>
+                 <option value="讲故事">讲故事</option>
+                 <option value="激动">激动</option>
+                 <option value="舒缓">舒缓</option>
+               </select>
+             </div>
+
+             <div class="flex items-center gap-2">
+               <label class="text-zinc-500 dark:text-zinc-400">最大分段字符:</label>
+               <input
+                 type="number"
+                 v-model.number="maxChunkChars"
+                 min="100"
+                 max="1000"
+                 class="w-24 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+               />
+             </div>
+           </div>
 
           <!-- 生成按钮 -->
           <div class="mt-3 flex items-center gap-3">
@@ -339,7 +350,7 @@
                 
                 <!-- 音频播放器 -->
                 <div v-if="item.status === 'completed' && getHistoryAudioUrl(item)" class="mt-3">
-                  <audio :src="getHistoryAudioUrl(item)" controls class="w-full"></audio>
+                  <audio :src="getHistoryAudioUrl(item)" controls class="w-full" preload="none"></audio>
                 </div>
               </div>
               
@@ -551,6 +562,7 @@ const modelSize = ref('')
 const selectedModel = ref('')
 const loadingModel = ref(false)
 const tone = ref('')
+const maxChunkChars = ref(500)
 
 const loading = ref(false)
 const statusText = ref('')
@@ -693,15 +705,15 @@ async function confirmDeleteProfile() {
 
 async function confirmDeleteHistory(item: any) {
   if (!confirm('确定要删除此历史记录吗？')) return
+  
   try {
     await deleteHistoryItem(item.id)
     await loadHistory()
     if (currentAudio.value?.includes(item.id)) {
       currentAudio.value = null
     }
-  } catch (err) {
-    console.error('Failed to delete history:', err)
-    alert('删除失败: ' + (err as Error).message)
+  } catch (err: any) {
+    alert('删除失败: ' + err.message)
   }
 }
 
@@ -952,9 +964,14 @@ async function handleHistoryClick(item: any) {
 
 async function checkBackend() {
   try {
-    const res = await fetch('/voicebox-web/')
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 3000)
+    const res = await fetch('/voicebox-web/profiles', { signal: controller.signal })
+    clearTimeout(timeoutId)
+    
     if (res.ok) {
-      backendOnline.value = true
+      const data = await res.json()
+      backendOnline.value = Array.isArray(data)
     } else {
       backendOnline.value = false
     }
@@ -1144,6 +1161,7 @@ async function handleGenerate() {
       language: language.value,
       model_size: modelSize.value,
       instruct: tone.value || undefined,
+      max_chunk_chars: maxChunkChars.value,
     }, signal)
     
     statusText.value = '等待生成完成...'
