@@ -548,8 +548,8 @@ const newsType = ref<'newspaper' | 'tv'>('newspaper')
 const articles = ref<any[]>([])
 const articlesLoading = ref(false)
 const selectedArticle = ref<any>(null)
-const beginDate = ref(new Date().toISOString().split('T')[0])
-const endDate = ref(new Date().toISOString().split('T')[0])
+const beginDate = ref(todayStr())
+const endDate = ref(todayStr())
 const error = ref<string | null>(null)
 
 const profiles = ref<any[]>([])
@@ -629,7 +629,12 @@ const getCheckedTvText = computed(() => {
 })
 
 function todayStr() {
-  return new Date().toISOString().split('T')[0]
+  const now = new Date()
+  const offset = 8 * 60 * 60 * 1000
+  const beijing = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + offset)
+  return beijing.getFullYear() + '-' +
+    String(beijing.getMonth() + 1).padStart(2, '0') + '-' +
+    String(beijing.getDate()).padStart(2, '0')
 }
 
 function selectAllTvParagraphs() {
