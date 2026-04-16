@@ -10,14 +10,16 @@ export interface VoiceProfile {
 }
 
 export interface GenerationRequest {
-  profile_id: string
+  profile_id?: string
+  voice_id?: string
   text: string
   language?: string
   seed?: number
-  model_size?: string
   instruct?: string
   engine?: string
+  model_size?: string
   max_chunk_chars?: number
+  speed?: number
 }
 
 export interface GenerationResponse {
@@ -64,6 +66,19 @@ export interface ModelInfo {
   downloading: boolean
   size_mb: number | null
   loaded: boolean
+  supports_clone?: boolean
+}
+
+export interface PresetVoice {
+  voice_id: string
+  name: string
+  gender: string
+  language: string
+}
+
+export interface PresetVoicesResponse {
+  engine: string
+  voices: PresetVoice[]
 }
 
 export async function fetchProfiles(signal?: AbortSignal): Promise<VoiceProfile[]> {
@@ -141,8 +156,8 @@ export async function generateSpeech(
   return JSON.parse(cleanText)
 }
 
-export async function getGenerationStatus(id: string): Promise<GenerationResponse> {
-  const res = await fetch(`${API_BASE}/generate/${id}/status`)
+export async function getGenerationStatus(id: string, signal?: AbortSignal): Promise<GenerationResponse> {
+  const res = await fetch(`${API_BASE}/generate/${id}/status`, { signal })
   if (!res.ok) throw new Error('Failed to get status')
   const text = await res.text()
   let cleanText = text.replace(/^data:\s*/, '').trim()
@@ -194,6 +209,12 @@ export async function fetchModels(): Promise<ModelInfo[]> {
   return data.models || []
 }
 
+export async function fetchPresetVoices(engine: string): Promise<PresetVoicesResponse> {
+  const res = await fetch(`${API_BASE}/profiles/presets/${engine}`)
+  if (!res.ok) throw new Error('Failed to fetch preset voices')
+  return res.json()
+}
+
 export async function downloadModel(modelName: string): Promise<void> {
   const res = await fetch(`${API_BASE}/models/download`, {
     method: 'POST',
@@ -203,8 +224,8 @@ export async function downloadModel(modelName: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to download model')
 }
 
-export async function loadModel(modelSize: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/models/load?model_size=${modelSize}`, {
+export async function loadModel(modelName: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/models/load?model_name=${modelName}`, {
     method: 'POST'
   })
   if (!res.ok) throw new Error('Failed to load model')
@@ -409,5 +430,51 @@ export async function fetchTvNewsDetail(listId: string): Promise<any> {
 export async function fetchTvArticle(docId: string): Promise<any> {
   const res = await fetch(`${API_BASE}/articles/get_tv_article?docid=${docId}`)
   if (!res.ok) throw new Error('Failed to fetch TV article')
+  return res.json()
+}
+
+export interface AvailableEffect {
+  type: string
+  label: string
+  description: string
+  params: Record<string, {
+    default: number
+    min: number
+    max: number
+    step: number
+    description: string
+  }>
+}
+
+export interface EffectConfig {
+  type: string
+  enabled?: boolean
+  params: Record<string, number | string | boolean>
+}
+
+export async function fetchAvailableEffects(): Promise<AvailableEffect[]> {
+  const res = await fetch(`${API_BASE}/effects/available`)
+  if (!res.ok) throw new Error('Failed to fetch effects')
+  const data = await res.json()
+  return data.effects
+}
+
+export async function fetchProfileEffects(profileId: string): Promise<EffectConfig[] | null> {
+  const res = await fetch(`${API_BASE}/profiles/${profileId}`)
+  if (!res.ok) throw new Error('Failed to fetch profile')
+  const data = await res.json()
+  return data.effects_chain || null
+}
+
+export async function updateProfileEffects(profileId: string, effectsChain: EffectConfig[] | null): Promise<VoiceProfile> {
+  const res = await fetch(`${API_BASE}/profiles/${profileId}/effects`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ effects_chain: effectsChain })
+  })
+  if (!res.ok) {
+    const error = await res.text()
+    throw new Error(error || 'Failed to update effects')
+  }
   return res.json()
 }

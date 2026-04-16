@@ -1,5 +1,14 @@
 <template>
   <div class="flex flex-col min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
+    <!-- Toast 提示 -->
+    <div
+      v-if="toast.show"
+      class="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg shadow-lg text-white"
+      :class="toast.type === 'error' ? 'bg-red-500' : toast.type === 'success' ? 'bg-green-500' : 'bg-blue-500'"
+    >
+      {{ toast.message }}
+    </div>
+
     <header class="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-6 py-4">
       <div class="max-w-7xl mx-auto flex items-center justify-between">
         <h1 class="text-xl font-semibold">舟传媒科技部TTS</h1>
@@ -156,6 +165,16 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
               </svg>
             </button>
+            <button
+              @click="openEffectsModal"
+              :disabled="!selectedProfile || profiles.length === 0"
+              class="px-2 py-1.5 text-sm rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 disabled:opacity-50 disabled:hover:bg-zinc-100"
+              title="效果配置"
+            >
+              <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+              </svg>
+            </button>
           </div>
 
           <!-- TV模式：分段选择 -->
@@ -227,21 +246,6 @@
               </select>
             </div>
 
-            <div class="flex items-center gap-2">
-              <label class="text-zinc-500 dark:text-zinc-400">模型:</label>
-              <select
-                v-model="selectedModel"
-                @change="handleModelChange"
-                :disabled="loadingModel"
-                class="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option v-for="m in models" :key="m.model_name" :value="m.model_name">
-                  {{ m.display_name }}{{ m.loaded ? ' (已加载)' : '' }}
-                </option>
-              </select>
-              <span v-if="loadingModel" class="text-xs text-blue-500">加载中...</span>
-            </div>
-
              <div class="flex items-center gap-2">
                <label class="text-zinc-500 dark:text-zinc-400">语调:</label>
                <select
@@ -258,7 +262,34 @@
              </div>
 
              <div class="flex items-center gap-2">
-               <label class="text-zinc-500 dark:text-zinc-400">最大分段字符:</label>
+               <label class="text-zinc-500 dark:text-zinc-400">模型:</label>
+               <select
+                 v-model="selectedModel"
+                 @change="handleModelChange"
+                 :disabled="loadingModel"
+                 class="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option v-for="m in models" :key="m.model_name" :value="m.model_name">
+                    {{ m.display_name }}{{ m.loaded ? ' (已加载)' : '' }}{{ m.supports_clone === false ? ' [固定音色]' : '' }}
+                  </option>
+                </select>
+               <span v-if="loadingModel" class="text-xs text-blue-500">加载中...</span>
+              </div>
+
+              <div v-if="!currentModelSupportsClone && currentPresetVoices.length > 0" class="flex items-center gap-2">
+                <label class="text-zinc-500 dark:text-zinc-400">音色:</label>
+                <select
+                  v-model="selectedVoiceId"
+                  class="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option v-for="v in currentPresetVoices" :key="v.voice_id" :value="v.voice_id">
+                    {{ v.name }} ({{ v.gender }}, {{ v.language }})
+                  </option>
+                </select>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <label class="text-zinc-500 dark:text-zinc-400">最大分段字符:</label>
                <input
                  type="number"
                  v-model.number="maxChunkChars"
@@ -266,14 +297,14 @@
                  max="1000"
                  class="w-24 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                />
-             </div>
-           </div>
+              </div>
+            </div>
 
-          <!-- 生成按钮 -->
+           <!-- 生成按钮 -->
           <div class="mt-3 flex items-center gap-3">
             <button
               @click="handleGenerate"
-              :disabled="loading || !selectedProfile || (newsType === 'tv' ? getCheckedTvText.length === 0 : !text.trim()) || backendOnline === false"
+              :disabled="loading || (currentModelSupportsClone ? !selectedProfile : !selectedVoiceId) || (newsType === 'tv' ? getCheckedTvText.length === 0 : !text.trim()) || backendOnline === false"
               class="px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-300 disabled:cursor-not-allowed text-white font-medium transition-colors"
             >
               {{ loading ? '生成中...' : '生成' }}
@@ -288,7 +319,6 @@
             <span v-if="loading" class="text-sm text-zinc-500">
               {{ statusText }} ({{ formatTime(elapsedTime) }})
             </span>
-            <span v-if="error" class="text-sm text-red-500">{{ error }}</span>
           </div>
 
           <!-- 音频播放 -->
@@ -410,6 +440,8 @@
                 <span v-else class="text-zinc-400">
                   {{ model.size_mb ? (model.size_mb / 1024).toFixed(1) + ' GB' : '' }}
                 </span>
+                <span v-if="model.supports_clone" class="ml-2 text-blue-500">支持音色克隆</span>
+                <span v-else class="ml-2 text-zinc-500">固定音色</span>
               </div>
             </div>
             <button
@@ -535,12 +567,93 @@
         </div>
       </div>
     </div>
+
+    <!-- 效果配置弹窗 -->
+    <div
+      v-if="showEffectsModal"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      @click.self="showEffectsModal = false"
+    >
+      <div class="bg-white dark:bg-zinc-900 rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
+        <div class="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+          <h3 class="text-lg font-semibold">效果配置</h3>
+          <button @click="showEffectsModal = false" class="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="p-6 overflow-y-auto max-h-[calc(80vh-130px)]">
+          <div v-if="effectsLoading" class="text-center py-8 text-zinc-500">加载中...</div>
+          <div v-else class="space-y-6">
+            <div v-for="effect in availableEffects" :key="effect.type" class="border border-zinc-200 dark:border-zinc-700 rounded-lg p-4">
+              <div class="flex items-center gap-3 mb-3">
+                <input
+                  type="checkbox"
+                  :id="'effect-' + effect.type"
+                  :checked="isEffectEnabled(effect.type)"
+                  @change="toggleEffect(effect.type)"
+                  class="w-4 h-4 rounded"
+                />
+                <label :for="'effect-' + effect.type" class="font-medium cursor-pointer">
+                  {{ effectLabels[effect.type] || effect.label }}
+                </label>
+              </div>
+              <p class="text-sm text-zinc-500 mb-3">{{ effect.description }}</p>
+              <div v-if="isEffectEnabled(effect.type)" class="grid grid-cols-2 gap-4">
+                <div v-for="(param, paramKey) in effect.params" :key="paramKey" class="space-y-1">
+                  <label class="text-xs text-zinc-500">{{ effectLabelsZh[effect.type]?.[String(paramKey)] || param.description }}</label>
+                  <div class="flex items-center gap-2">
+                    <template v-if="param.options">
+                      <select
+                        :value="getEffectParam(effect.type, String(paramKey))"
+                        @change="setEffectParam(effect.type, String(paramKey), ($event.target as HTMLSelectElement).value)"
+                        class="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option v-for="opt in param.options" :key="opt" :value="opt">{{ opt }}</option>
+                      </select>
+                    </template>
+                    <template v-else>
+                      <input
+                        type="range"
+                        :min="param.min"
+                        :max="param.max"
+                        :step="param.step"
+                        :value="getEffectParam(effect.type, String(paramKey))"
+                        @input="setEffectParam(effect.type, String(paramKey), Number(($event.target as HTMLInputElement).value))"
+                        class="flex-1"
+                      />
+                      <span class="text-sm w-16 text-right">{{ getEffectParam(effect.type, String(paramKey)) }}</span>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 flex justify-end gap-2">
+          <button
+            @click="resetEffects"
+            class="px-4 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          >
+            重置
+          </button>
+          <button
+            @click="saveEffects"
+            :disabled="effectsLoading"
+            class="px-4 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            保存
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import { fetchProfiles, generateSpeech, getGenerationStatus, fetchHistory, fetchModels, downloadModel, loadModel, createProfile, uploadProfileSample, deleteProfile, deleteHistoryItem } from '@/api'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick, onBeforeUnmount } from 'vue'
+import { fetchProfiles, generateSpeech, getGenerationStatus, fetchHistory, fetchModels, downloadModel, loadModel, createProfile, uploadProfileSample, deleteProfile, deleteHistoryItem, fetchAvailableEffects, fetchProfileEffects, updateProfileEffects, fetchPresetVoices, type AvailableEffect, type EffectConfig } from '@/api'
 import { fetchPaperArticles, fetchTvNewsLists, fetchTvNewsDetail, fetchTvArticle, fetchArticleDetail } from '@/api'
 
 const activeTab = ref<'generate' | 'history'>('generate')
@@ -551,6 +664,12 @@ const selectedArticle = ref<any>(null)
 const beginDate = ref(todayStr())
 const endDate = ref(todayStr())
 const error = ref<string | null>(null)
+const toast = ref<{ show: boolean; message: string; type: 'error' | 'success' | 'info' }>({ show: false, message: '', type: 'info' })
+
+function showToast(message: string, type: 'error' | 'success' | 'info' = 'info') {
+  toast.value = { show: true, message, type }
+  setTimeout(() => { toast.value.show = false }, 3000)
+}
 
 const profiles = ref<any[]>([])
 const selectedProfile = ref<string | null>(null)
@@ -558,8 +677,10 @@ const showModelsModal = ref(false)
 
 const text = ref('')
 const language = ref('zh')
-const modelSize = ref('')
 const selectedModel = ref('')
+const selectedVoiceId = ref<string>('')
+const selectedSpeed = ref<number>(1.0)
+const presetVoices = ref<{ engine: string; voices: any[] }[]>([])
 const loadingModel = ref(false)
 const tone = ref('')
 const maxChunkChars = ref(500)
@@ -574,6 +695,35 @@ const backendOnline = ref<boolean | null>(null)
 const loadingFromHistory = ref(false)
 const showCreateProfileModal = ref(false)
 const creatingProfile = ref(false)
+const showEffectsModal = ref(false)
+const availableEffects = ref<AvailableEffect[]>([])
+const profileEffects = ref<EffectConfig[]>([])
+const effectsLoading = ref(false)
+
+const effectLabels: Record<string, string> = {
+  chorus: '合唱/镶边',
+  reverb: '混响',
+  delay: '延迟',
+  compressor: '压缩器',
+  gain: '增益',
+  highpass: '高通滤波',
+  lowpass: '低通滤波',
+  pitch_shift: '音调调整',
+  speed: '语速'
+}
+
+const effectLabelsZh: Record<string, Record<string, string>> = {
+  chorus: { rate_hz: '速度(Hz)', depth: '深度', feedback: '反馈', centre_delay_ms: '中心延迟(ms)', mix: '混合' },
+  reverb: { room_size: '房间大小', damping: '阻尼', wet_level: '混响电平', dry_level: '干声电平', width: '宽度' },
+  delay: { delay_seconds: '延迟时间(s)', feedback: '反馈', mix: '混合' },
+  compressor: { threshold_db: '阈值(dB)', ratio: '压缩比', attack_ms: '启动时间(ms)', release_ms: '释放时间(ms)' },
+  gain: { gain_db: '增益(dB)' },
+  highpass: { cutoff_frequency_hz: '截止频率(Hz)' },
+  lowpass: { cutoff_frequency_hz: '截止频率(Hz)' },
+  pitch_shift: { semitones: '半音程' },
+  speed: { speed: '倍率', algorithm: '算法' }
+}
+
 const newProfile = ref({
   name: '',
   description: '',
@@ -597,6 +747,17 @@ const models = ref<any[]>([])
 const modelsLoading = ref(false)
 
 const loadedModels = computed(() => models.value.filter(m => m.loaded))
+const currentModelSupportsClone = computed(() => {
+  const model = models.value.find(m => m.model_name === selectedModel.value)
+  if (model?.supports_clone === true) return true
+  if (model?.supports_clone === false) return false
+  return true
+})
+const currentPresetVoices = computed(() => {
+  const engine = getEngine(selectedModel.value)
+  const preset = presetVoices.value.find(p => p.engine === engine)
+  return preset?.voices || []
+})
 
 const abortController = ref<AbortController | null>(null)
 let elapsedInterval: ReturnType<typeof setInterval> | null = null
@@ -744,6 +905,81 @@ function closeCreateProfileModal() {
   }
 }
 
+async function openEffectsModal() {
+  if (!selectedProfile.value) return
+  showEffectsModal.value = true
+  effectsLoading.value = true
+  try {
+    const [effects, profileEffs] = await Promise.all([
+      fetchAvailableEffects(),
+      fetchProfileEffects(selectedProfile.value)
+    ])
+    availableEffects.value = effects
+    profileEffects.value = profileEffs || []
+  } catch (err) {
+    console.error('Failed to load effects:', err)
+    showToast('加载效果失败', 'error')
+    showEffectsModal.value = false
+  } finally {
+    effectsLoading.value = false
+  }
+}
+
+function isEffectEnabled(type: string): boolean {
+  return profileEffects.value.some(e => e.type === type)
+}
+
+function getEffectParam(type: string, paramKey: string): number {
+  const effect = profileEffects.value.find(e => e.type === type)
+  return (effect?.params?.[paramKey] as number) ?? 
+    availableEffects.value.find(e => e.type === type)?.params?.[paramKey]?.default ?? 0
+}
+
+function toggleEffect(type: string) {
+  const idx = profileEffects.value.findIndex(e => e.type === type)
+  if (idx >= 0) {
+    profileEffects.value.splice(idx, 1)
+  } else {
+    const effectDef = availableEffects.value.find(e => e.type === type)
+    if (effectDef) {
+      const params: Record<string, number> = {}
+      for (const key in effectDef.params) {
+        params[key] = effectDef.params[key].default
+      }
+      profileEffects.value.push({ type, params })
+    }
+  }
+}
+
+function setEffectParam(type: string, paramKey: string, value: number | string) {
+  let effect = profileEffects.value.find(e => e.type === type)
+  if (!effect) {
+    effect = { type, params: {} }
+    profileEffects.value.push(effect)
+  }
+  if (!effect.params) effect.params = {}
+  effect.params[paramKey] = value
+}
+
+async function saveEffects() {
+  if (!selectedProfile.value) return
+  effectsLoading.value = true
+  try {
+    await updateProfileEffects(selectedProfile.value, profileEffects.value.length > 0 ? profileEffects.value : null)
+    showEffectsModal.value = false
+    showToast('效果保存成功', 'success')
+  } catch (err) {
+    console.error('Failed to save effects:', err)
+    showToast('保存效果失败', 'error')
+  } finally {
+    effectsLoading.value = false
+  }
+}
+
+function resetEffects() {
+  profileEffects.value = []
+}
+
 function triggerFileInput() {
   fileInput.value?.click()
 }
@@ -821,6 +1057,15 @@ function stopRecording() {
 }
 
 function createWavBlob(chunks: Float32Array[], sampleRate: number): Blob {
+  let maxGain = 1.0
+  for (const chunk of chunks) {
+    for (let i = 0; i < chunk.length; i++) {
+      const abs = Math.abs(chunk[i])
+      if (abs > maxGain) maxGain = abs
+    }
+  }
+  const gain = maxGain > 0.95 ? 0.9 / maxGain : 1.0
+  
   const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0)
   const buffer = new ArrayBuffer(44 + totalLength * 2)
   const view = new DataView(buffer)
@@ -848,7 +1093,7 @@ function createWavBlob(chunks: Float32Array[], sampleRate: number): Blob {
   let offset = 44
   for (const chunk of chunks) {
     for (let i = 0; i < chunk.length; i++) {
-      const sample = Math.max(-1, Math.min(1, chunk[i]))
+      const sample = Math.max(-1, Math.min(1, chunk[i] * gain))
       view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true)
       offset += 2
     }
@@ -880,7 +1125,6 @@ async function loadModels() {
       const loaded = models.value.find(m => m.loaded)
       selectedModel.value = loaded?.model_name || models.value[0]?.model_name || ''
     }
-    updateModelSize()
   } catch (err) {
     console.error('Failed to load models:', err)
   } finally {
@@ -888,23 +1132,44 @@ async function loadModels() {
   }
 }
 
-function updateModelSize() {
-  const model = models.value.find(m => m.model_name === selectedModel.value)
-  modelSize.value = model ? getModelSize(model.model_name) : ''
-}
-
 async function handleModelChange() {
-  updateModelSize()
   const model = models.value.find(m => m.model_name === selectedModel.value)
   if (model && !model.loaded) {
     loadingModel.value = true
     try {
-      await loadModel(getModelSize(model.model_name))
+      await loadModel(model.model_name)
       await loadModels()
     } catch (err) {
       console.error('Load model error:', err)
     } finally {
       loadingModel.value = false
+    }
+  }
+  selectedVoiceId.value = ''
+  await loadPresetVoices()
+}
+
+async function loadPresetVoices() {
+  const engine = getEngine(selectedModel.value)
+  if (!currentModelSupportsClone.value && !presetVoices.value.some(p => p.engine === engine)) {
+    try {
+      const data = await fetchPresetVoices(engine)
+      const existing = presetVoices.value.findIndex(p => p.engine === engine)
+      if (existing >= 0) {
+        presetVoices.value[existing] = data
+      } else {
+        presetVoices.value.push(data)
+      }
+      if (data.voices.length > 0) {
+        selectedVoiceId.value = data.voices[0].voice_id
+      } else {
+        selectedVoiceId.value = ''
+        showToast('该模型暂无可用音色', 'info')
+      }
+    } catch (err) {
+      console.error('Load preset voices error:', err)
+      showToast('加载预设音色失败', 'error')
+      selectedVoiceId.value = ''
     }
   }
 }
@@ -918,14 +1183,30 @@ async function handleDownloadModel(modelName: string) {
   }
 }
 
-function getModelSize(modelName: string): string {
+function getModelSize(modelName: string): string | null {
   const match = modelName.match(/(\d+\.?\d*B)/i)
-  return match ? match[1] : modelName
+  return match ? match[1].toUpperCase() : null
+}
+
+function getEngine(modelName: string): string {
+  const engineMap: Record<string, string> = {
+    'qwen-tts-1.7B': 'qwen',
+    'qwen-tts-0.6B': 'qwen',
+    'qwen-custom-voice-1.7B': 'qwen_custom_voice',
+    'qwen-custom-voice-0.6B': 'qwen_custom_voice',
+    'luxtts': 'luxtts',
+    'chatterbox-tts': 'chatterbox',
+    'chatterbox-turbo': 'chatterbox_turbo',
+    'tada-1b': 'tada',
+    'tada-3b-ml': 'tada',
+    'kokoro': 'kokoro'
+  }
+  return engineMap[modelName] || modelName
 }
 
 async function handleLoadModel(modelName: string) {
   try {
-    await loadModel(getModelSize(modelName))
+    await loadModel(modelName)
     await loadModels()
   } catch (err) {
     console.error('Load model error:', err)
@@ -936,9 +1217,11 @@ function getHistoryAudioUrl(item: any): string | null {
   let audioId = ''
   if (item.versions && item.versions.length > 0) {
     const defaultVersion = item.versions.find((v: any) => v.is_default) || item.versions[0]
-    audioId = defaultVersion.audio_path.split('/').pop()?.replace('.wav', '') || ''
+    const name = defaultVersion.audio_path.split('/').pop()?.replace('.wav', '') || ''
+    audioId = name.endsWith('_processed') ? name.slice(0, -10) : name
   } else if (item.audio_path) {
-    audioId = item.audio_path.split('/').pop()?.replace('.wav', '') || ''
+    const name = item.audio_path.split('/').pop()?.replace('.wav', '') || ''
+    audioId = name.endsWith('_processed') ? name.slice(0, -10) : name
   }
   return audioId ? `/voicebox-web/audio/${audioId}` : null
 }
@@ -1043,7 +1326,7 @@ async function loadArticles() {
     }
   } catch (err) {
     articles.value = []
-    error.value = '加载文章列表失败'
+    showToast('加载文章列表失败', 'error')
     console.error(err)
   } finally {
     articlesLoading.value = false
@@ -1126,7 +1409,7 @@ async function handleArticleClick(article: any) {
 async function waitForCompletion(id: string, signal: AbortSignal): Promise<any> {
   while (true) {
     if (signal.aborted) break
-    const status = await getGenerationStatus(id)
+    const status = await getGenerationStatus(id, signal)
     if (status.status === 'completed') {
       return status
     } else if (status.status === 'failed') {
@@ -1138,7 +1421,18 @@ async function waitForCompletion(id: string, signal: AbortSignal): Promise<any> 
 
 async function handleGenerate() {
   const targetText = newsType.value === 'tv' ? getCheckedTvText.value : text.value
-  if (!selectedProfile.value || !targetText.trim()) return
+  if (currentModelSupportsClone.value && !selectedProfile.value) {
+    showToast('请选择音色', 'error')
+    return
+  }
+  if (!currentModelSupportsClone.value && !selectedVoiceId.value) {
+    showToast('请选择预设音色', 'error')
+    return
+  }
+  if (!targetText.trim()) {
+    showToast('请输入文本', 'error')
+    return
+  }
   
   if (abortController.value) {
     abortController.value.abort()
@@ -1160,14 +1454,25 @@ async function handleGenerate() {
   }, 1000)
   
   try {
-    const result = await generateSpeech({
-      profile_id: selectedProfile.value,
+    const engine = getEngine(selectedModel.value)
+    const req: any = {
       text: targetText.trim(),
       language: language.value,
-      model_size: modelSize.value,
+      engine: engine,
       instruct: tone.value || undefined,
       max_chunk_chars: maxChunkChars.value,
-    }, signal)
+    }
+    if (currentModelSupportsClone.value) {
+      req.profile_id = selectedProfile.value
+    } else {
+      req.voice_id = selectedVoiceId.value
+      if (selectedSpeed.value !== 1.0) {
+        req.speed = selectedSpeed.value
+      }
+    }
+    const ms = getModelSize(selectedModel.value)
+    if (ms) req.model_size = ms
+    const result = await generateSpeech(req, signal)
     
     statusText.value = '等待生成完成...'
     const final = await waitForCompletion(result.id, signal)
@@ -1184,10 +1489,10 @@ async function handleGenerate() {
     if (err.name === 'AbortError') {
       statusText.value = '已取消'
     } else {
-      error.value = err.message || '生成失败'
+      showToast(err.message || '生成失败', 'error')
       statusText.value = '失败'
+      console.error('生成失败:', err.message || err)
     }
-    console.error(err)
   } finally {
     loading.value = false
     if (elapsedInterval) {
@@ -1236,7 +1541,6 @@ watch(models, () => {
   if (models.value.length > 0 && !selectedModel.value) {
     const loaded = models.value.find(m => m.loaded)
     selectedModel.value = loaded?.model_name || models.value[0]?.model_name || ''
-    updateModelSize()
   }
 })
 </script>
