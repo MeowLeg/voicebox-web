@@ -236,32 +236,6 @@
           <!-- 参数配置 -->
           <div class="mt-3 flex flex-wrap items-center gap-3 text-sm">
             <div class="flex items-center gap-2">
-              <label class="text-zinc-500 dark:text-zinc-400">语言:</label>
-              <select
-                v-model="language"
-                class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="zh">中文</option>
-                <option value="en">英文</option>
-              </select>
-            </div>
-
-             <div class="flex items-center gap-2">
-               <label class="text-zinc-500 dark:text-zinc-400">语调:</label>
-               <select
-                 v-model="tone"
-                 class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-               >
-                 <option value="">正常</option>
-                 <option value="播音腔">播音腔</option>
-                 <option value="新闻播报">新闻播报</option>
-                 <option value="讲故事">讲故事</option>
-                 <option value="激动">激动</option>
-                 <option value="舒缓">舒缓</option>
-               </select>
-             </div>
-
-             <div class="flex items-center gap-2">
                <label class="text-zinc-500 dark:text-zinc-400">模型:</label>
                <select
                  v-model="selectedModel"
@@ -297,6 +271,19 @@
                  max="1000"
                  class="w-24 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                />
+              </div>
+
+              <div class="flex items-center gap-2">
+                <label class="text-zinc-500 dark:text-zinc-400">语速:</label>
+                <input
+                  type="range"
+                  v-model.number="selectedSpeed"
+                  min="0.8"
+                  max="1.2"
+                  step="0.05"
+                  class="w-24"
+                />
+                <span class="text-sm w-12 text-right">{{ selectedSpeed.toFixed(2) }}x</span>
               </div>
             </div>
 
@@ -603,7 +590,33 @@
               <div v-if="isEffectEnabled(effect.type)" class="grid grid-cols-2 gap-4">
                 <div v-for="(param, paramKey) in effect.params" :key="paramKey" class="space-y-1">
                   <label class="text-xs text-zinc-500">{{ effectLabelsZh[effect.type]?.[String(paramKey)] || param.description }}</label>
-                  <div class="flex items-center gap-2">
+            <div class="hidden">
+              <label class="text-zinc-500 dark:text-zinc-400">语言:</label>
+              <select
+                v-model="language"
+                class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="zh">中文</option>
+                <option value="en">英文</option>
+              </select>
+            </div>
+
+             <div class="hidden">
+               <label class="text-zinc-500 dark:text-zinc-400">语调:</label>
+               <select
+                 v-model="tone"
+                 class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+               >
+                 <option value="">正常</option>
+                 <option value="播音腔">播音腔</option>
+                 <option value="新闻播报">新闻播报</option>
+                 <option value="讲故事">讲故事</option>
+                 <option value="激动">激动</option>
+                 <option value="舒缓">舒缓</option>
+               </select>
+             </div>
+
+             <div class="flex items-center gap-2">
                     <template v-if="param.options">
                       <select
                         :value="getEffectParam(effect.type, String(paramKey))"
@@ -1218,10 +1231,10 @@ function getHistoryAudioUrl(item: any): string | null {
   if (item.versions && item.versions.length > 0) {
     const defaultVersion = item.versions.find((v: any) => v.is_default) || item.versions[0]
     const name = defaultVersion.audio_path.split('/').pop()?.replace('.wav', '') || ''
-    audioId = name.endsWith('_processed') ? name.slice(0, -10) : name
+    audioId = name.replace(/_processed$/, '').replace(/_speed$/, '')
   } else if (item.audio_path) {
     const name = item.audio_path.split('/').pop()?.replace('.wav', '') || ''
-    audioId = name.endsWith('_processed') ? name.slice(0, -10) : name
+    audioId = name.replace(/_processed$/, '').replace(/_speed$/, '')
   }
   return audioId ? `/voicebox-web/audio/${audioId}` : null
 }
@@ -1466,9 +1479,9 @@ async function handleGenerate() {
       req.profile_id = selectedProfile.value
     } else {
       req.voice_id = selectedVoiceId.value
-      if (selectedSpeed.value !== 1.0) {
-        req.speed = selectedSpeed.value
-      }
+    }
+    if (selectedSpeed.value !== 1.0) {
+      req.speed = selectedSpeed.value
     }
     const ms = getModelSize(selectedModel.value)
     if (ms) req.model_size = ms
