@@ -1,6 +1,6 @@
-const voiceboxHost = 'http://61.153.213.238'
+const voiceboxHost = 'http://127.0.0.1'
 const voiceboxPort = '17493'
-const articlesHost = process.env.VUE_APP_ARTICLES_HOST || 'http://61.153.213.238'
+const articlesHost = process.env.VUE_APP_ARTICLES_HOST || 'http://127.0.0.1'
 const articlesPort = process.env.VUE_APP_ARTICLES_PORT || '4029'
 
 const voiceboxTarget = `${voiceboxHost}:${voiceboxPort}`
