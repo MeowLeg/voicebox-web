@@ -1,5 +1,20 @@
+export * from './auth'
+
 const API_BASE = '/voicebox-web'
 // const API_BASE = 'http://61.153.213.238:17493'  // 直接访问后端（仅开发调试用）
+
+function authFetch(url: string, init?: RequestInit): Promise<Response> {
+  // 文章接口不需要认证
+  if (url.includes('/articles/')) {
+    return fetch(url, init)
+  }
+  const token = localStorage.getItem('voicebox_token')
+  if (!token) return fetch(url, init)
+  const existingHeaders = init?.headers
+  const newHeaders = new Headers(existingHeaders)
+  newHeaders.set('Authorization', `Bearer ${token}`)
+  return fetch(url, { ...init, headers: newHeaders })
+}
 
 export interface VoiceProfile {
   id: string
@@ -82,7 +97,7 @@ export interface PresetVoicesResponse {
 }
 
 export async function fetchProfiles(signal?: AbortSignal): Promise<VoiceProfile[]> {
-  const res = await fetch(`${API_BASE}/profiles`, { signal })
+  const res = await authFetch(`${API_BASE}/profiles`, { signal })
   if (!res.ok) throw new Error('Failed to fetch profiles')
   return res.json()
 }
@@ -95,7 +110,7 @@ export async function createProfile(data: {
   preset_engine?: string
   preset_voice_id?: string
 }): Promise<VoiceProfile> {
-  const res = await fetch(`${API_BASE}/profiles`, {
+  const res = await authFetch(`${API_BASE}/profiles`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -108,7 +123,7 @@ export async function createProfile(data: {
 }
 
 export async function deleteProfile(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/profiles/${id}`, {
+  const res = await authFetch(`${API_BASE}/profiles/${id}`, {
     method: 'DELETE'
   })
   if (!res.ok) {
@@ -126,7 +141,7 @@ export async function uploadProfileSample(
   formData.append('file', audioBlob, 'sample.wav')
   formData.append('reference_text', referenceText)
   
-  const res = await fetch(`${API_BASE}/profiles/${profileId}/samples`, {
+  const res = await authFetch(`${API_BASE}/profiles/${profileId}/samples`, {
     method: 'POST',
     body: formData
   })
@@ -140,7 +155,7 @@ export async function generateSpeech(
   req: GenerationRequest,
   signal?: AbortSignal
 ): Promise<GenerationResponse> {
-  const res = await fetch(`${API_BASE}/generate`, {
+  const res = await authFetch(`${API_BASE}/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -150,23 +165,30 @@ export async function generateSpeech(
     const error = await res.text()
     throw new Error(error || 'Generation failed')
   }
-  const text = await res.text()
-  let cleanText = text.replace(/^data:\s*/, '').trim()
-  cleanText = cleanText.split('\n')[0].trim()
-  return JSON.parse(cleanText)
+  return parseResponse(res)
+}
+
+function parseResponse(res: Response): Promise<any> {
+  const ct = res.headers.get('content-type') || ''
+  if (ct.includes('text/event-stream')) {
+    return res.text().then(text => {
+      const line = text.split('\n').find(l => l.startsWith('data:'))
+      if (!line) throw new Error('No SSE data received')
+      const json = line.slice(5).trim()
+      return JSON.parse(json)
+    })
+  }
+  return res.json()
 }
 
 export async function getGenerationStatus(id: string, signal?: AbortSignal): Promise<GenerationResponse> {
-  const res = await fetch(`${API_BASE}/generate/${id}/status`, { signal })
+  const res = await authFetch(`${API_BASE}/generate/${id}/status`, { signal })
   if (!res.ok) throw new Error('Failed to get status')
-  const text = await res.text()
-  let cleanText = text.replace(/^data:\s*/, '').trim()
-  cleanText = cleanText.split('\n')[0].trim()
-  return JSON.parse(cleanText)
+  return parseResponse(res)
 }
 
 export async function fetchHistory(limit = 50): Promise<HistoryItem[]> {
-  const res = await fetch(`${API_BASE}/history?limit=${limit}`)
+  const res = await authFetch(`${API_BASE}/history?limit=${limit}`)
   if (!res.ok) throw new Error('Failed to fetch history')
   const data = await res.json()
   return data.items || []
@@ -179,11 +201,8 @@ export async function deleteHistoryItem(id: string): Promise<void> {
   const timeoutId = setTimeout(() => controller.abort(), 10000)
   
   try {
-    const res = await fetch(url, {
+    const res = await authFetch(url, {
       method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json'
-      },
       signal: controller.signal
     })
     
@@ -203,20 +222,20 @@ export async function deleteHistoryItem(id: string): Promise<void> {
 }
 
 export async function fetchModels(): Promise<ModelInfo[]> {
-  const res = await fetch(`${API_BASE}/models/status`)
+  const res = await authFetch(`${API_BASE}/models/status`)
   if (!res.ok) throw new Error('Failed to fetch models')
   const data = await res.json()
   return data.models || []
 }
 
 export async function fetchPresetVoices(engine: string): Promise<PresetVoicesResponse> {
-  const res = await fetch(`${API_BASE}/profiles/presets/${engine}`)
+  const res = await authFetch(`${API_BASE}/profiles/presets/${engine}`)
   if (!res.ok) throw new Error('Failed to fetch preset voices')
   return res.json()
 }
 
 export async function downloadModel(modelName: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/models/download`, {
+  const res = await authFetch(`${API_BASE}/models/download`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model_name: modelName })
@@ -225,7 +244,7 @@ export async function downloadModel(modelName: string): Promise<void> {
 }
 
 export async function loadModel(modelName: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/models/load?model_name=${modelName}`, {
+  const res = await authFetch(`${API_BASE}/models/load?model_name=${modelName}`, {
     method: 'POST'
   })
   if (!res.ok) throw new Error('Failed to load model')
@@ -399,7 +418,7 @@ export async function fetchPaperArticles(params: {
   if (params.beginDate) query.set('beginDate', params.beginDate)
   if (params.endDate) query.set('endDate', params.endDate)
   
-  const res = await fetch(`${API_BASE}/articles/get_paper_articles?${query.toString()}`)
+  const res = await authFetch(`${API_BASE}/articles/get_paper_articles?${query.toString()}`)
   if (!res.ok) throw new Error('Failed to fetch articles')
   const json = await res.json()
   return json.data || []
@@ -408,7 +427,7 @@ export async function fetchPaperArticles(params: {
 export async function fetchArticleDetail(metadataId: string): Promise<any> {
   const url = `${API_BASE}/articles/get_paper_article_detail?metadataId=${metadataId}`
   console.log('Fetching article detail from:', url)
-  const res = await fetch(url)
+  const res = await authFetch(url)
   console.log('Response status:', res.status)
   const json = await res.json()
   console.log('Response data:', json)
@@ -416,19 +435,19 @@ export async function fetchArticleDetail(metadataId: string): Promise<any> {
 }
 
 export async function fetchTvNewsLists(startTime: string, endTime: string, columnId: string): Promise<any> {
-  const res = await fetch(`${API_BASE}/articles/get_tv_newslists?startTime=${startTime}&endTime=${endTime}&columnId=${columnId}`)
+  const res = await authFetch(`${API_BASE}/articles/get_tv_newslists?startTime=${startTime}&endTime=${endTime}&columnId=${columnId}`)
   if (!res.ok) throw new Error('Failed to fetch TV news lists')
   return res.json()
 }
 
 export async function fetchTvNewsDetail(listId: string): Promise<any> {
-  const res = await fetch(`${API_BASE}/articles/get_tv_newslist_detail?llistid=${listId}`)
+  const res = await authFetch(`${API_BASE}/articles/get_tv_newslist_detail?llistid=${listId}`)
   if (!res.ok) throw new Error('Failed to fetch TV news detail')
   return res.json()
 }
 
 export async function fetchTvArticle(docId: string): Promise<any> {
-  const res = await fetch(`${API_BASE}/articles/get_tv_article?docid=${docId}`)
+  const res = await authFetch(`${API_BASE}/articles/get_tv_article?docid=${docId}`)
   if (!res.ok) throw new Error('Failed to fetch TV article')
   return res.json()
 }
@@ -453,21 +472,21 @@ export interface EffectConfig {
 }
 
 export async function fetchAvailableEffects(): Promise<AvailableEffect[]> {
-  const res = await fetch(`${API_BASE}/effects/available`)
+  const res = await authFetch(`${API_BASE}/effects/available`)
   if (!res.ok) throw new Error('Failed to fetch effects')
   const data = await res.json()
   return data.effects
 }
 
 export async function fetchProfileEffects(profileId: string): Promise<EffectConfig[] | null> {
-  const res = await fetch(`${API_BASE}/profiles/${profileId}`)
+  const res = await authFetch(`${API_BASE}/profiles/${profileId}`)
   if (!res.ok) throw new Error('Failed to fetch profile')
   const data = await res.json()
   return data.effects_chain || null
 }
 
 export async function updateProfileEffects(profileId: string, effectsChain: EffectConfig[] | null): Promise<VoiceProfile> {
-  const res = await fetch(`${API_BASE}/profiles/${profileId}/effects`, {
+  const res = await authFetch(`${API_BASE}/profiles/${profileId}/effects`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ effects_chain: effectsChain })

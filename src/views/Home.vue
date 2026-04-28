@@ -29,6 +29,16 @@
               {{ backendOnline === true ? '后端已连接' : backendOnline === false ? '后端未连接' : '连接中...' }}
             </span>
           </div>
+          <div class="w-px h-5 bg-zinc-200 dark:bg-zinc-700"></div>
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-zinc-600 dark:text-zinc-300">{{ auth.user?.username }}</span>
+            <button
+              @click="auth.logout"
+              class="text-sm text-zinc-500 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400"
+            >
+              退出
+            </button>
+          </div>
         </div>
       </div>
     </header>
@@ -142,6 +152,7 @@
             <label class="text-sm text-zinc-500 dark:text-zinc-400">音色:</label>
             <select
               v-model="selectedProfile"
+              @change="selectedProfileName = profiles.find(p => p.id === selectedProfile)?.name || null"
               class="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option v-for="profile in profiles" :key="profile.id" :value="profile.id">
@@ -665,9 +676,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick, onBeforeUnmount } from 'vue'
-import { fetchProfiles, generateSpeech, getGenerationStatus, fetchHistory, fetchModels, downloadModel, loadModel, createProfile, uploadProfileSample, deleteProfile, deleteHistoryItem, fetchAvailableEffects, fetchProfileEffects, updateProfileEffects, fetchPresetVoices, type AvailableEffect, type EffectConfig } from '@/api'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { fetchProfiles, generateSpeech, getGenerationStatus, fetchModels, downloadModel, loadModel, createProfile, uploadProfileSample, deleteProfile, fetchAvailableEffects, fetchProfileEffects, updateProfileEffects, fetchPresetVoices, createAudioRecord, listAudioRecords, deleteAudioRecord, type AvailableEffect, type EffectConfig } from '@/api'
 import { fetchPaperArticles, fetchTvNewsLists, fetchTvNewsDetail, fetchTvArticle, fetchArticleDetail } from '@/api'
+import { useAuth } from '@/composables/useAuth'
+
+const auth = useAuth()
 
 const activeTab = ref<'generate' | 'history'>('generate')
 const newsType = ref<'newspaper' | 'tv'>('newspaper')
@@ -686,6 +700,7 @@ function showToast(message: string, type: 'error' | 'success' | 'info' = 'info')
 
 const profiles = ref<any[]>([])
 const selectedProfile = ref<string | null>(null)
+const selectedProfileName = ref<string | null>(null)
 const showModelsModal = ref(false)
 
 const text = ref('')
@@ -746,12 +761,10 @@ const newProfile = ref({
 })
 const fileInput = ref<HTMLInputElement | null>(null)
 const isRecording = ref(false)
-const mediaRecorder = ref<MediaRecorder | null>(null)
-const recordedChunks = ref<Blob[]>([])
+const recordingStream = ref<MediaStream | null>(null)
 const audioContext = ref<AudioContext | null>(null)
-const mediaStreamSource = ref<MediaStreamAudioSourceNode | null>(null)
+const scriptProcessor = ref<ScriptProcessorNode | null>(null)
 const audioChunks = ref<Float32Array[]>([])
-const recordingStartTime = ref(0)
 
 const history = ref<any[]>([])
 const historyLoading = ref(false)
@@ -838,6 +851,7 @@ async function loadProfiles() {
     profiles.value = await fetchProfiles()
     if (profiles.value.length > 0 && !selectedProfile.value) {
       selectedProfile.value = profiles.value[0].id
+      selectedProfileName.value = profiles.value[0].name
     }
   } catch (err) {
     console.error('Failed to load profiles:', err)
@@ -856,6 +870,7 @@ async function handleCreateProfile() {
     await uploadProfileSample(profile.id, newProfile.value.audioFile, newProfile.value.referenceText.trim())
     await loadProfiles()
     selectedProfile.value = profile.id
+    selectedProfileName.value = profile.name
     closeCreateProfileModal()
   } catch (err) {
     console.error('Failed to create profile:', err)
@@ -873,8 +888,10 @@ async function confirmDeleteProfile() {
     await loadProfiles()
     if (profiles.value.length > 0) {
       selectedProfile.value = profiles.value[0].id
+      selectedProfileName.value = profiles.value[0].name
     } else {
       selectedProfile.value = null
+      selectedProfileName.value = null
     }
   } catch (err) {
     console.error('Failed to delete profile:', err)
@@ -886,7 +903,7 @@ async function confirmDeleteHistory(item: any) {
   if (!confirm('确定要删除此历史记录吗？')) return
   
   try {
-    await deleteHistoryItem(item.id)
+    await deleteAudioRecord(item.id)
     await loadHistory()
     if (currentAudio.value?.includes(item.id)) {
       currentAudio.value = null
@@ -899,16 +916,17 @@ async function confirmDeleteHistory(item: any) {
 function closeCreateProfileModal() {
   showCreateProfileModal.value = false
   if (isRecording.value) {
-    isRecording.value = false
-    if (audioContext.value) {
-      audioContext.value.close()
-    }
-    const stream = (mediaRecorder.value as any)?.getAudioTracks?.()?.[0]
-    if (stream) {
-      stream.stop()
-    }
-    audioChunks.value = []
+    stopRecording()
   }
+  if (audioContext.value) {
+    audioContext.value.close()
+    audioContext.value = null
+  }
+  if (recordingStream.value) {
+    recordingStream.value.getTracks().forEach(t => t.stop())
+    recordingStream.value = null
+  }
+  audioChunks.value = []
   newProfile.value = {
     name: '',
     description: '',
@@ -1025,48 +1043,53 @@ async function toggleRecording() {
 async function startRecording() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    recordingStream.value = stream
     audioContext.value = new AudioContext({ sampleRate: 24000 })
-    mediaStreamSource.value = audioContext.value.createMediaStreamSource(stream)
+    const source = audioContext.value.createMediaStreamSource(stream)
     
-    const scriptProcessor = audioContext.value.createScriptProcessor(4096, 1, 1)
-    mediaStreamSource.value.connect(scriptProcessor)
-    scriptProcessor.connect(audioContext.value.destination)
+    const sp = audioContext.value.createScriptProcessor(4096, 1, 1)
+    source.connect(sp)
+    scriptProcessor.value = sp
     
     audioChunks.value = []
     
-    scriptProcessor.onaudioprocess = (event) => {
+    sp.onaudioprocess = (event) => {
       if (isRecording.value) {
         const inputData = event.inputBuffer.getChannelData(0)
         audioChunks.value.push(new Float32Array(inputData))
       }
     }
     
-    recordingStartTime.value = Date.now()
     isRecording.value = true
-    
-    mediaRecorder.value = stream as any
   } catch (err) {
     console.error('Failed to start recording:', err)
   }
 }
 
 function stopRecording() {
-  if (isRecording.value && audioContext.value && mediaStreamSource.value) {
-    mediaStreamSource.value.disconnect()
+  if (!isRecording.value) return
+  
+  isRecording.value = false
+  
+  if (scriptProcessor.value) {
+    scriptProcessor.value.disconnect()
+    scriptProcessor.value = null
+  }
+  if (audioContext.value) {
     audioContext.value.close()
-    
-    const stream = (mediaRecorder.value as any)?.getAudioTracks?.()?.[0]
-    if (stream) {
-      stream.stop()
-    }
-    
+    audioContext.value = null
+  }
+  if (recordingStream.value) {
+    recordingStream.value.getTracks().forEach(t => t.stop())
+    recordingStream.value = null
+  }
+  
+  if (audioChunks.value.length > 0) {
     const wavBlob = createWavBlob(audioChunks.value, 24000)
     const file = new File([wavBlob], 'recording.wav', { type: 'audio/wav' })
     newProfile.value.audioFile = file
-    
-    isRecording.value = false
-    audioChunks.value = []
   }
+  audioChunks.value = []
 }
 
 function createWavBlob(chunks: Float32Array[], sampleRate: number): Blob {
@@ -1097,7 +1120,7 @@ function createWavBlob(chunks: Float32Array[], sampleRate: number): Blob {
   view.setUint16(20, 1, true)
   view.setUint16(22, 1, true)
   view.setUint32(24, sampleRate, true)
-  view.setUint32(28, sampleRate * 2, true)
+  view.setUint32(28, sampleRate * numChannels * (bitsPerSample / 8), true)
   view.setUint16(32, 2, true)
   view.setUint16(34, 16, true)
   writeString(36, 'data')
@@ -1118,10 +1141,11 @@ function createWavBlob(chunks: Float32Array[], sampleRate: number): Blob {
 async function loadHistory() {
   try {
     historyLoading.value = true
-    const data = await fetchHistory()
-    history.value = data.map((item: any) => ({
+    const res = await listAudioRecords({ page: 1, page_size: 100 })
+    history.value = res.items.map((item: any) => ({
       ...item,
-      expanded: false
+      expanded: false,
+      audio_path: item.audio_url || null,
     }))
   } catch (err) {
     console.error('Failed to load history:', err)
@@ -1197,7 +1221,7 @@ async function handleDownloadModel(modelName: string) {
 }
 
 function getModelSize(modelName: string): string | null {
-  const match = modelName.match(/(\d+\.?\d*B)/i)
+  const match = modelName.match(/\b(\d+\.?\d*B)\b/i)
   return match ? match[1].toUpperCase() : null
 }
 
@@ -1227,6 +1251,10 @@ async function handleLoadModel(modelName: string) {
 }
 
 function getHistoryAudioUrl(item: any): string | null {
+  // auth_backend 记录直接保存了 audio_url
+  if (item.audio_url) return item.audio_url
+  
+  // 兼容 voicebox 后端格式
   let audioId = ''
   if (item.versions && item.versions.length > 0) {
     const defaultVersion = item.versions.find((v: any) => v.is_default) || item.versions[0]
@@ -1266,10 +1294,10 @@ async function handleHistoryClick(item: any) {
 async function checkBackend() {
   try {
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 3000)
+    const timeoutId = setTimeout(() => controller.abort(), 10000)
     const res = await fetch('/voicebox-web/profiles', { signal: controller.signal })
     clearTimeout(timeoutId)
-    
+
     if (res.ok) {
       const data = await res.json()
       backendOnline.value = Array.isArray(data)
@@ -1354,6 +1382,7 @@ async function handleArticleClick(article: any) {
   success.value = false
   
   if (newsType.value === 'tv') {
+    text.value = ''
     tvParagraphs.value = [{ text: '加载中...', checked: true }]
     try {
       const res = await fetchTvArticle(article.docid.toString())
@@ -1496,6 +1525,26 @@ async function handleGenerate() {
     currentAudio.value = `/voicebox-web/audio/${audioId}`
     statusText.value = '完成!'
     success.value = true
+    
+    // 保存到用户记录
+    try {
+      await createAudioRecord({
+        voicebox_generation_id: audioId,
+        profile_id: req.profile_id || req.voice_id || undefined,
+        profile_name: req.profile_id ? (selectedProfileName.value || undefined) : undefined,
+        text: targetText.trim(),
+        language: language.value || undefined,
+        audio_url: `/voicebox-web/audio/${audioId}`,
+        duration: final.duration || undefined,
+        seed: final.seed || undefined,
+        instruct: final.instruct || undefined,
+        engine: final.engine || undefined,
+        model_size: final.model_size || undefined,
+        status: final.status || 'completed',
+      })
+    } catch (e) {
+      console.error('保存用户记录失败:', e)
+    }
     
     await loadHistory()
   } catch (err: any) {
