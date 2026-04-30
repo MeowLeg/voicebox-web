@@ -36,6 +36,13 @@ module.exports = {
           proxyReq.path = req.url.replace(/^\/voicebox-web/, '');
         }
       },
+      '/voicebox-web/queue': {
+        target: authTarget,
+        changeOrigin: true,
+        onProxyReq: (proxyReq, req) => {
+          proxyReq.path = req.url.replace(/^\/voicebox-web/, '');
+        }
+      },
       '/voicebox-web': {
         target: voiceboxTarget,
         changeOrigin: true,

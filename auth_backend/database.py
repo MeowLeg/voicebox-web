@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, String, Boolean, DateTime, Integer, Float, ForeignKey
+from sqlalchemy import create_engine, Column, String, Boolean, DateTime, Integer, Float, ForeignKey, Text, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
@@ -44,6 +44,23 @@ class AudioRecord(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="audio_records")
+
+
+class QueueTask(Base):
+    __tablename__ = "queue_tasks"
+
+    id = Column(String, primary_key=True, index=True)
+    user_id = Column(String, nullable=False, index=True)
+    request_data = Column(JSON, nullable=False)
+    voicebox_generation_id = Column(String, nullable=True, index=True)
+    status = Column(String, default="pending", index=True)
+    position = Column(Integer, default=0)
+    progress = Column(Float, default=0.0)
+    error = Column(String, nullable=True)
+    audio_url = Column(String, nullable=True)
+    duration = Column(Float, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow)
 
 
 def init_db():

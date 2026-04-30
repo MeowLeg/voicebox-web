@@ -57,7 +57,7 @@
             新闻生成
           </button>
           <button
-            @click="activeTab = 'history'"
+            @click="activeTab = 'history'; loadHistory()"
             :class="['px-6 py-3 text-sm font-medium transition-colors',
               activeTab === 'history' 
                 ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400' 
@@ -69,7 +69,7 @@
       </div>
     </div>
 
-    <main class="flex-1 max-w-7xl w-full mx-auto px-6 py-6">
+    <main class="flex-1 max-w-7xl w-full mx-auto px-6 py-6 flex gap-6">
       <!-- 新闻生成标签页 -->
       <div v-show="activeTab === 'generate'">
 
@@ -298,28 +298,7 @@
               </div>
             </div>
 
-           <!-- 生成按钮 -->
-          <div class="mt-3 flex items-center gap-3">
-            <button
-              @click="handleGenerate"
-              :disabled="loading || (currentModelSupportsClone ? !selectedProfile : !selectedVoiceId) || (newsType === 'tv' ? getCheckedTvText.length === 0 : !text.trim()) || backendOnline === false"
-              class="px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-300 disabled:cursor-not-allowed text-white font-medium transition-colors"
-            >
-              {{ loading ? '生成中...' : '生成' }}
-            </button>
-            <button
-              v-if="loading"
-              @click="handleStop"
-              class="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-            >
-              停止
-            </button>
-            <span v-if="loading" class="text-sm text-zinc-500">
-              {{ statusText }} ({{ formatTime(elapsedTime) }})
-            </span>
-          </div>
-
-          <!-- 音频播放 -->
+           <!-- 音频播放 -->
           <div v-if="currentAudio || currentAudioBlob" class="mt-3 flex items-center gap-3">
             <audio v-if="currentAudio" :src="currentAudio" controls class="flex-1"></audio>
             <audio v-else-if="currentAudioBlob" :src="URL.createObjectURL(currentAudioBlob)" controls class="flex-1"></audio>
@@ -336,11 +315,62 @@
             </span>
           </div>
         </div>
+
+        <!-- 右侧队列面板 -->
+        <div class="w-80 shrink-0 border-l border-zinc-200 dark:border-zinc-800 p-4 flex flex-col">
+          <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">生成队列 ({{ queueList.length }})</h3>
+          <div class="flex-1 overflow-y-auto space-y-3">
+            <div v-if="queueList.length === 0" class="text-xs text-zinc-400 text-center py-4">暂无任务</div>
+            <div
+              v-for="task in queueList"
+              :key="task.id"
+              class="p-3 rounded-lg border text-xs"
+              :class="{
+                'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20': task.status === 'processing',
+                'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20': task.status === 'pending',
+              }"
+            >
+              <div class="flex items-center justify-between mb-1">
+                <span class="font-medium truncate flex-1 mr-2">{{ task.text?.slice(0, 30) || '...' }}</span>
+                <span
+                  class="shrink-0 px-1.5 py-0.5 rounded text-xs"
+                  :class="{
+                    'bg-blue-100 text-blue-700 dark:bg-blue-800 dark:text-blue-300': task.status === 'processing',
+                    'bg-yellow-100 text-yellow-700 dark:bg-yellow-800 dark:text-yellow-300': task.status === 'pending',
+                  }"
+                >
+                  {{ task.status === 'pending' ? '排队' : '生成中' }}
+                </span>
+              </div>
+              <div v-if="task.status === 'pending'" class="text-zinc-400">
+                排队中{{ task.position > 0 ? ` (第${task.position}位)` : '' }}
+              </div>
+              <div v-if="task.status === 'processing'" class="space-y-1">
+                <div class="w-full h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
+                  <div
+                    class="h-full rounded-full bg-blue-500 transition-all duration-500"
+                    :style="{ width: `${task.progress || 10}%` }"
+                  ></div>
+                </div>
+                <div class="text-zinc-400">{{ Math.round(task.progress || 0) }}%</div>
+              </div>
+            </div>
+          </div>
+          <div class="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-700">
+            <button
+              @click="handleGenerate"
+              :disabled="(currentModelSupportsClone ? !selectedProfile : !selectedVoiceId) || (newsType === 'tv' ? getCheckedTvText.length === 0 : !text.trim()) || backendOnline === false"
+              class="w-full px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-300 disabled:cursor-not-allowed text-white font-medium transition-colors text-sm"
+            >
+              添加到队列
+            </button>
+          </div>
+        </div>
       </div>
       </div>
 
       <!-- 历史记录标签页 -->
-      <div v-show="activeTab === 'history'" class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-6" style="height: calc(100vh - 180px)">
+      <div v-show="activeTab === 'history'" class="w-full bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-6" style="height: calc(100vh - 180px)">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-lg font-semibold">历史记录</h2>
           <div class="text-sm text-zinc-400">共 {{ history.length }} 条记录</div>
@@ -410,8 +440,6 @@
         </div>
       </div>
     </main>
-
-    <!-- 模型管理弹窗 -->
     <div v-if="showModelsModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showModelsModal = false">
       <div class="bg-white dark:bg-zinc-900 rounded-xl p-6 w-[500px] max-h-[80vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-4">
@@ -680,6 +708,7 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { fetchProfiles, generateSpeech, getGenerationStatus, fetchModels, downloadModel, loadModel, createProfile, uploadProfileSample, deleteProfile, fetchAvailableEffects, fetchProfileEffects, updateProfileEffects, fetchPresetVoices, createAudioRecord, listAudioRecords, deleteAudioRecord, type AvailableEffect, type EffectConfig } from '@/api'
 import { fetchPaperArticles, fetchTvNewsLists, fetchTvNewsDetail, fetchTvArticle, fetchArticleDetail } from '@/api'
 import { useAuth } from '@/composables/useAuth'
+import { listQueueTasks, submitQueueTask } from '@/api/queue'
 
 const auth = useAuth()
 
@@ -722,6 +751,7 @@ const success = ref(false)
 const backendOnline = ref<boolean | null>(null)
 const loadingFromHistory = ref(false)
 const showCreateProfileModal = ref(false)
+const queueList = ref<any[]>([])
 const creatingProfile = ref(false)
 const showEffectsModal = ref(false)
 const availableEffects = ref<AvailableEffect[]>([])
@@ -786,7 +816,6 @@ const currentPresetVoices = computed(() => {
 })
 
 const abortController = ref<AbortController | null>(null)
-let elapsedInterval: ReturnType<typeof setInterval> | null = null
 
 function isSelected(article: any): boolean {
   if (!selectedArticle.value) return false
@@ -1316,11 +1345,20 @@ onMounted(() => {
   loadModels()
   checkBackend()
   setInterval(checkBackend, 30000)
+  fetchQueueList()
+  setInterval(fetchQueueList, 30000)
 })
 
-onUnmounted(() => {
-  if (elapsedInterval) clearInterval(elapsedInterval)
-})
+async function fetchQueueList() {
+  try {
+    const res = await listQueueTasks(undefined, 50)
+    queueList.value = (res.tasks || []).filter(
+      (task: any) => task.status === 'pending' || task.status === 'processing'
+    )
+  } catch (e) {
+    console.error('获取队列列表失败:', e)
+  }
+}
 
 async function loadArticles() {
   if (articlesLoading.value) return
@@ -1475,26 +1513,8 @@ async function handleGenerate() {
     showToast('请输入文本', 'error')
     return
   }
-  
-  if (abortController.value) {
-    abortController.value.abort()
-  }
-  abortController.value = new AbortController()
-  const signal = abortController.value.signal
-  
+
   loading.value = true
-  error.value = null
-  statusText.value = '提交任务...'
-  currentAudio.value = null
-  currentAudioBlob.value = null
-  success.value = false
-  const startTime = Date.now()
-  elapsedTime.value = 0
-  
-  elapsedInterval = setInterval(() => {
-    elapsedTime.value = Math.floor((Date.now() - startTime) / 1000)
-  }, 1000)
-  
   try {
     const engine = getEngine(selectedModel.value)
     const req: any = {
@@ -1514,53 +1534,14 @@ async function handleGenerate() {
     }
     const ms = getModelSize(selectedModel.value)
     if (ms) req.model_size = ms
-    const result = await generateSpeech(req, signal)
-    
-    statusText.value = '等待生成完成...'
-    const final = await waitForCompletion(result.id, signal)
-    
-    if (signal.aborted) return
-    
-    const audioId = final.id
-    currentAudio.value = `/voicebox-web/audio/${audioId}`
-    statusText.value = '完成!'
-    success.value = true
-    
-    // 保存到用户记录
-    try {
-      await createAudioRecord({
-        voicebox_generation_id: audioId,
-        profile_id: req.profile_id || req.voice_id || undefined,
-        profile_name: req.profile_id ? (selectedProfileName.value || undefined) : undefined,
-        text: targetText.trim(),
-        language: language.value || undefined,
-        audio_url: `/voicebox-web/audio/${audioId}`,
-        duration: final.duration || undefined,
-        seed: final.seed || undefined,
-        instruct: final.instruct || undefined,
-        engine: final.engine || undefined,
-        model_size: final.model_size || undefined,
-        status: final.status || 'completed',
-      })
-    } catch (e) {
-      console.error('保存用户记录失败:', e)
-    }
-    
-    await loadHistory()
+    await submitQueueTask(req)
+    showToast('任务已添加到队列', 'success')
+    await fetchQueueList()
   } catch (err: any) {
-    if (err.name === 'AbortError') {
-      statusText.value = '已取消'
-    } else {
-      showToast(err.message || '生成失败', 'error')
-      statusText.value = '失败'
-      console.error('生成失败:', err.message || err)
-    }
+    showToast(err.message || '提交任务失败', 'error')
+    console.error('提交任务失败:', err.message || err)
   } finally {
     loading.value = false
-    if (elapsedInterval) {
-      clearInterval(elapsedInterval)
-      elapsedInterval = null
-    }
   }
 }
 
@@ -1569,10 +1550,6 @@ function handleStop() {
     abortController.value.abort()
     statusText.value = '已取消'
     loading.value = false
-    if (elapsedInterval) {
-      clearInterval(elapsedInterval)
-      elapsedInterval = null
-    }
   }
 }
 

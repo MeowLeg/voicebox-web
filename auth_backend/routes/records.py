@@ -1,3 +1,5 @@
+import os
+import requests
 from datetime import datetime
 from typing import Optional
 from math import ceil
@@ -8,6 +10,8 @@ from pydantic import BaseModel
 
 from database import get_db, AudioRecord
 from routes.auth import get_current_user, User
+
+TTS_BACKEND_URL = os.environ.get("TTS_BACKEND_URL", "http://61.153.213.238:17493")
 
 router = APIRouter(prefix="/records", tags=["records"])
 
@@ -134,6 +138,17 @@ def delete_audio_record(
     ).first()
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
+
+    # Delete from TTS backend
+    if record.voicebox_generation_id:
+        try:
+            requests.delete(
+                f"{TTS_BACKEND_URL}/history/{record.voicebox_generation_id}",
+                timeout=10,
+            )
+        except Exception as e:
+            print(f"Warning: Failed to delete from TTS backend: {e}")
+
     db.delete(record)
     db.commit()
     return {"message": "已删除"}
