@@ -34,9 +34,18 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# articles
+/articles
+
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# python
+__pycache__/
+*.py[cod]
+*.db
+*.pyc

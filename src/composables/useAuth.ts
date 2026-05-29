@@ -1,15 +1,38 @@
-import { ref, computed } from 'vue'
+import { ref, computed, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { getToken, getUser, clearAuth, UserInfo } from '@/utils/auth'
-import { type AuthResponse } from '@/api'
+import { getToken, getUser, setUser, clearAuth, UserInfo } from '@/utils/auth'
+import { type AuthResponse, fetchCurrentUser } from '@/api'
 
 const user = ref<UserInfo | null>(getUser())
 const token = ref<string | null>(getToken())
 const loading = ref(false)
+const authReady = ref(false)
 
 export function useAuth() {
   const router = useRouter()
   const isLoggedIn = computed(() => !!token.value)
+
+  async function initAuth(): Promise<boolean> {
+    const stored = getToken()
+    if (!stored) {
+      authReady.value = true
+      return false
+    }
+    try {
+      const fresh = await fetchCurrentUser()
+      user.value = fresh
+      token.value = stored
+      setUser(fresh)
+      authReady.value = true
+      return true
+    } catch {
+      clearAuth()
+      token.value = null
+      user.value = null
+      authReady.value = true
+      return false
+    }
+  }
 
   async function login(username: string, password: string): Promise<AuthResponse> {
     loading.value = true
@@ -48,13 +71,15 @@ export function useAuth() {
     router.push('/login')
   }
 
-  return {
+  return reactive({
     user,
     token,
     loading,
+    authReady,
     isLoggedIn,
+    initAuth,
     login,
     register,
     logout
-  }
+  })
 }

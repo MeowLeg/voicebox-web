@@ -21,6 +21,7 @@ class AudioRecordRequest(BaseModel):
     profile_id: Optional[str] = None
     profile_name: Optional[str] = None
     text: str
+    title: Optional[str] = None
     language: Optional[str] = None
     audio_url: Optional[str] = None
     duration: Optional[float] = None
@@ -38,6 +39,7 @@ class AudioRecordResponse(BaseModel):
     profile_id: Optional[str]
     profile_name: Optional[str]
     text: str
+    title: Optional[str] = None
     language: Optional[str]
     audio_url: Optional[str]
     duration: Optional[float]

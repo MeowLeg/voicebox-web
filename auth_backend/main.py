@@ -2,9 +2,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import init_db
+from routes.articles import router as articles_router
 from routes.auth import router as auth_router
+from routes.audio import router as audio_router
+from routes.proxy import router as proxy_router
 from routes.records import router as records_router
 from routes.queue import router as queue_router
+from routes.asr import router as asr_router
 from worker import QueueWorker
 
 app = FastAPI(title="Voicebox Auth Service", version="0.1.0")
@@ -17,9 +21,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(articles_router)
 app.include_router(auth_router)
+app.include_router(audio_router)
 app.include_router(records_router)
 app.include_router(queue_router)
+app.include_router(asr_router)
+app.include_router(proxy_router)
 
 queue_worker = QueueWorker()
 

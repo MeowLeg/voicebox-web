@@ -17,6 +17,7 @@ class QueueSubmitRequest(BaseModel):
     profile_id: Optional[str] = None
     voice_id: Optional[str] = None
     text: str
+    title: Optional[str] = None
     language: Optional[str] = None
     seed: Optional[int] = None
     instruct: Optional[str] = None

@@ -54,6 +54,18 @@ export async function register(data: RegisterRequest): Promise<AuthResponse> {
   return res.json()
 }
 
+export async function fetchCurrentUser(): Promise<AuthResponse['user']> {
+  const token = getToken()
+  if (!token) throw new Error('未登录')
+  const res = await fetch('/voicebox-web/auth/me', {
+    headers: { Authorization: `Bearer ${token}` }
+  })
+  if (!res.ok) {
+    throw new Error('登录已过期')
+  }
+  return res.json()
+}
+
 // Audio Record API
 export interface AudioRecordRequest {
   voicebox_generation_id?: string
@@ -144,5 +156,87 @@ export async function deleteAudioRecord(id: string): Promise<void> {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.detail || '删除记录失败')
+  }
+}
+
+// Admin permission management
+export interface AdminUserItem {
+  id: string
+  username: string
+  email?: string
+  role: string
+  permissions: string[]
+}
+
+export async function fetchAdminUsers(): Promise<AdminUserItem[]> {
+  const token = getToken()
+  if (!token) throw new Error('请先登录')
+  const res = await fetch('/voicebox-web/auth/users', {
+    headers: { Authorization: `Bearer ${token}` }
+  })
+  if (!res.ok) throw new Error('获取用户列表失败')
+  const data = await res.json()
+  return data.users
+}
+
+export async function grantPermission(userId: string, permission: string): Promise<void> {
+  const token = getToken()
+  if (!token) throw new Error('请先登录')
+  const res = await fetch(`/voicebox-web/auth/users/${userId}/permissions`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ permission })
+  })
+  if (!res.ok) throw new Error('授权失败')
+}
+
+export async function revokePermission(userId: string, permission: string): Promise<void> {
+  const token = getToken()
+  if (!token) throw new Error('请先登录')
+  const res = await fetch(`/voicebox-web/auth/users/${userId}/permissions/${permission}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` }
+  })
+  if (!res.ok) throw new Error('撤销权限失败')
+}
+
+export async function createUser(data: { username: string; password: string; email?: string; role?: string }): Promise<void> {
+  const token = getToken()
+  if (!token) throw new Error('请先登录')
+  const res = await fetch('/voicebox-web/auth/users', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || '创建失败')
+  }
+}
+
+export async function updateUser(userId: string, data: { password?: string; email?: string; role?: string }): Promise<void> {
+  const token = getToken()
+  if (!token) throw new Error('请先登录')
+  const res = await fetch(`/voicebox-web/auth/users/${userId}`, {
+    method: 'PUT',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || '更新失败')
+  }
+}
+
+export async function deleteUser(userId: string): Promise<void> {
+  const token = getToken()
+  if (!token) throw new Error('请先登录')
+  const res = await fetch(`/voicebox-web/auth/users/${userId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` }
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || '删除失败')
   }
 }

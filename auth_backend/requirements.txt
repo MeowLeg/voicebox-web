@@ -4,3 +4,7 @@ python-jose[cryptography]==3.3.0
 bcrypt==4.2.0
 sqlalchemy==2.0.35
 python-multipart==0.0.12
+paddlepaddle>=3.0
+paddleocr>=3.0
+pymupdf>=1.0
+openai>=1.0

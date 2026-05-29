@@ -22,6 +22,7 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     audio_records = relationship("AudioRecord", back_populates="user", cascade="all, delete-orphan")
+    permissions = relationship("UserPermission", back_populates="user", cascade="all, delete-orphan")
 
 
 class AudioRecord(Base):
@@ -33,6 +34,7 @@ class AudioRecord(Base):
     profile_id = Column(String, nullable=True)
     profile_name = Column(String, nullable=True)
     text = Column(String, nullable=False)
+    title = Column(String, nullable=True)
     language = Column(String, nullable=True)
     audio_url = Column(String, nullable=True)
     duration = Column(Float, nullable=True)
@@ -61,6 +63,16 @@ class QueueTask(Base):
     duration = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class UserPermission(Base):
+    __tablename__ = "user_permissions"
+
+    id = Column(String, primary_key=True, index=True)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    permission = Column(String, nullable=False, index=True)
+
+    user = relationship("User", back_populates="permissions")
 
 
 def init_db():

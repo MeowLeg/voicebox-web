@@ -19,6 +19,13 @@
           >
             模型管理
           </button>
+          <button
+            v-if="auth.user?.role === 'admin'"
+            @click="showAdminModal = true; loadAdminUsers()"
+            class="text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+          >
+            用户管理
+          </button>
           <div class="flex items-center gap-2">
             <span class="w-2 h-2 rounded-full" :class="{
               'bg-green-500': backendOnline === true,
@@ -32,8 +39,8 @@
           <div class="w-px h-5 bg-zinc-200 dark:bg-zinc-700"></div>
           <div class="flex items-center gap-2">
             <span class="text-sm text-zinc-600 dark:text-zinc-300">{{ auth.user?.username }}</span>
-            <button
-              @click="auth.logout"
+           <button
+             @click="auth.logout"
               class="text-sm text-zinc-500 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400"
             >
               退出
@@ -69,86 +76,106 @@
       </div>
     </div>
 
-    <main class="flex-1 max-w-7xl w-full mx-auto px-6 py-6 flex gap-6">
+     <main class="flex-1 max-w-[100rem] w-full mx-auto px-6 py-6 flex gap-6">
       <!-- 新闻生成标签页 -->
       <div v-show="activeTab === 'generate'">
 
         <div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 flex overflow-hidden" style="height: calc(100vh - 180px)">
         
         <!-- 左侧：文章选择 -->
-        <div class="w-72 shrink-0 border-r border-zinc-200 dark:border-zinc-800 p-4 flex flex-col">
+         <div class="w-72 shrink-0 border-r border-zinc-200 dark:border-zinc-800 p-4 flex flex-col">
           <h2 class="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide shrink-0">文章选择</h2>
           
-          <!-- News Type Tabs -->
-          <div class="flex gap-1 mt-3 mb-2">
-            <div
-              @click="newsType = 'newspaper'"
-              :class="['flex-1 py-1.5 text-xs text-center cursor-pointer', 
-                newsType === 'newspaper' ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-500 dark:text-zinc-400']"
-            >
-              报纸新闻
-            </div>
-            <div
-              @click="newsType = 'tv'"
-              :class="['flex-1 py-1.5 text-xs text-center cursor-pointer',
-                newsType === 'tv' ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-500 dark:text-zinc-400']"
-            >
-              电视新闻
-            </div>
-          </div>
+           <!-- News Type Tabs -->
+           <div class="flex gap-1 mt-3 mb-2">
+             <div
+               @click="newsType = 'newspaper'"
+               :class="['flex-1 py-1.5 text-xs text-center cursor-pointer', 
+                 newsType === 'newspaper' ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-500 dark:text-zinc-400']"
+             >
+               报纸新闻
+             </div>
+             <div
+               v-if="SHOW_TV_NEWS"
+               @click="newsType = 'tv'"
+               :class="['flex-1 py-1.5 text-xs text-center cursor-pointer',
+                 newsType === 'tv' ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-500 dark:text-zinc-400']"
+             >
+               电视新闻
+             </div>
+             <div
+               @click="newsType = 'manual'"
+               :class="['flex-1 py-1.5 text-xs text-center cursor-pointer',
+                 newsType === 'manual' ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-500 dark:text-zinc-400']"
+             >
+               手动输入
+             </div>
+           </div>
           
-          <div class="shrink-0 flex items-center gap-2">
-            <label class="block text-xs text-zinc-400 mb-1">日期</label>
-            <input
-              type="date"
-              v-model="beginDate"
-              :max="todayStr()"
-              @change="endDate = beginDate; loadArticles()"
-              class="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <button
-              @click="loadArticles"
-              :disabled="articlesLoading"
-              class="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50"
-              title="刷新"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-              </svg>
-            </button>
-          </div>
+           <div v-if="newsType !== 'manual'" class="shrink-0 flex items-center gap-2">
+             <label class="block text-xs text-zinc-400 mb-1">日期</label>
+             <input
+               type="date"
+               v-model="beginDate"
+               :max="todayStr()"
+               @change="endDate = beginDate; loadArticles()"
+               class="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+             />
+             <button
+               @click="loadArticles"
+               :disabled="articlesLoading"
+               class="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50"
+               title="刷新"
+             >
+               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+               </svg>
+             </button>
+           </div>
 
-          <div class="flex-1 overflow-y-auto mt-2 space-y-1">
-            <div v-if="articlesLoading" class="text-sm text-zinc-400 text-center py-4">加载中...</div>
-            <div v-else-if="error" class="text-sm text-red-500 text-center py-4">{{ error }}</div>
-            <div v-else-if="articles.length === 0" class="text-sm text-zinc-400 text-center py-4">暂无文章</div>
-            <div
-              v-else
-              v-for="article in articles"
-              :key="article.ID || article.id"
-              @click="handleArticleClick(article)"
-              :class="[
-                'w-full text-left px-3 py-2 rounded-lg text-sm truncate cursor-pointer',
-                isSelected(article) ? 'text-zinc-900 dark:text-zinc-100 font-medium' : 'text-zinc-500 dark:text-zinc-400'
-              ]"
-            >
-              {{ article.TITLE || article.title }}
-            </div>
-          </div>
+           <div v-if="newsType === 'manual'" class="flex-1 flex items-center justify-center">
+             <p class="text-xs text-zinc-400 text-center">在右侧文本框直接输入或粘贴文本</p>
+           </div>
+           <div v-else class="flex-1 overflow-y-auto mt-2 space-y-1">
+             <div v-if="articlesLoading" class="text-sm text-zinc-400 text-center py-4">加载中...</div>
+             <div v-else-if="error" class="text-sm text-red-500 text-center py-4">{{ error }}</div>
+             <div v-else-if="articles.length === 0" class="text-sm text-zinc-400 text-center py-4">暂无文章</div>
+             <div
+               v-else
+               v-for="article in articles"
+               :key="article.ID || article.id"
+               @click="handleArticleClick(article)"
+               :class="[
+                 'w-full text-left px-3 py-2 rounded-lg text-sm truncate cursor-pointer',
+                 isSelected(article) ? 'text-zinc-900 dark:text-zinc-100 font-medium' : 'text-zinc-500 dark:text-zinc-400'
+               ]"
+             >
+               {{ article.TITLE || article.title }}
+             </div>
+           </div>
         </div>
 
         <!-- 中间：内容编辑区 -->
         <div class="flex-1 flex flex-col p-4 min-w-0">
           <div class="flex items-center justify-between mb-2">
             <h2 class="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
-              {{ newsType === 'tv' ? '电视新闻' : '报纸新闻' }}内容
-            </h2>
+               {{ newsType === 'tv' ? '电视新闻' : newsType === 'manual' ? '手动输入' : '报纸新闻' }}内容
+             </h2>
             <span v-if="selectedArticle" class="text-xs text-zinc-400">
               {{ selectedArticle.TITLE || selectedArticle.title }}
             </span>
           </div>
 
-          <div class="mb-3 flex items-center gap-2">
+           <div class="mb-3 flex items-center gap-2">
+             <label class="text-sm text-zinc-500 dark:text-zinc-400 shrink-0">标题:</label>
+             <input
+               v-model="title"
+               type="text"
+               class="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+               :placeholder="newsType === 'manual' ? '请输入标题（可选）' : '选择文章后自动填充'"
+             />
+           </div>
+           <div class="mb-3 flex items-center gap-2">
             <label class="text-sm text-zinc-500 dark:text-zinc-400">音色:</label>
             <select
               v-model="selectedProfile"
@@ -197,17 +224,48 @@
               请在左侧选择电视新闻稿件
             </div>
             <div v-else class="flex-1 overflow-y-auto space-y-2 pr-2">
-              <div class="flex items-center gap-2 mb-2">
-                <button
-                  @click="selectAllTvParagraphs"
-                  class="text-xs px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700"
-                >
-                  {{ tvParagraphs.filter(p => !p.isLabel).every(p => p.checked) ? '取消全选' : '全选' }}
-                </button>
-                <span class="text-xs text-zinc-400">
-                  已选中 {{ checkedTvParagraphs.length }} 段，共 {{ getCheckedTvText.length }} 字符
-                </span>
-              </div>
+               <div class="flex items-center gap-2 mb-2">
+                 <button
+                   @click="selectAllTvParagraphs"
+                   class="text-xs px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                 >
+                   {{ tvParagraphs.filter(p => !p.isLabel).every(p => p.checked) ? '取消全选' : '全选' }}
+                 </button>
+                 <button
+                   v-if="selectedArticle"
+                   @click="searchVideo"
+                   :disabled="videoSearching"
+                   class="text-xs px-2 py-1 rounded bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-400"
+                 >
+                   {{ videoSearching ? '搜索中...' : '搜索视频' }}
+                 </button>
+                 <span class="text-xs text-zinc-400">
+                   已选中 {{ checkedTvParagraphs.length }} 段，共 {{ getCheckedTvText.length }} 字符
+                 </span>
+               </div>
+               <div v-if="videoResults.length > 0" class="mb-2 p-2 rounded bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs max-h-48 overflow-y-auto">
+                 <div class="font-medium mb-1">视频搜索结果 ({{ videoResults.length }})</div>
+                 <div v-for="(v, vi) in videoResults" :key="vi" class="flex items-center gap-2 py-1.5 border-t border-zinc-100 dark:border-zinc-700 first:border-t-0 rounded px-1"
+                    :class="selectedVideoIndex === vi ? 'bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-400' : 'cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700'"
+                    @click="selectedVideoIndex = vi">
+                   <img v-if="v.key_frame_path" :src="v.key_frame_path" class="w-12 h-9 object-cover rounded shrink-0" />
+                   <div class="min-w-0 flex-1">{{ v.name }}</div>
+                    <button @click.stop="playVideo(v)" class="text-xs px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-zinc-600 dark:text-zinc-300" title="播放">&#9654;</button>
+                 </div>
+               </div>
+               <div v-else-if="videoSearched" class="mb-2 text-xs text-zinc-400">暂无搜索结果</div>
+               <div v-if="selectedVideoIndex !== null" class="mb-2 p-2 rounded bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs">
+                  <div class="font-medium mb-1">选中: {{ videoResults[selectedVideoIndex]?.name }}</div>
+                  <button
+                    @click="fetchSoundbiteAlignment"
+                    :disabled="asrAligning"
+                    class="text-xs px-3 py-1.5 rounded bg-green-600 hover:bg-green-700 disabled:bg-zinc-400 text-white font-medium transition-colors"
+                  >
+                    {{ asrAligning ? 'ASR对齐中...' : '获取同期声音频位置' }}
+                  </button>
+                  <div v-if="asrResults.length > 0" class="mt-2 text-xs text-green-600 dark:text-green-400">
+                    已匹配 {{ asrResults.length }} 段同期声
+                  </div></div>
               <template
                 v-for="(p, idx) in tvParagraphs"
                 :key="idx"
@@ -222,7 +280,15 @@
                     class="mt-1 shrink-0 w-4 h-4"
                   />
                   <div class="flex-1">
-                    <div v-if="p.label" class="text-xs text-zinc-400 mb-1">{{ p.label }}</div>
+                    <div v-if="p.label" class="text-xs text-zinc-400 mb-1 flex items-center gap-1 flex-wrap">
+                      <span>{{ p.label }}</span>
+                      <template v-if="p.asrStartTime != null">
+                        <button @click="toggleSoundbite(p)" class="shrink-0 w-4 h-4 flex items-center justify-center rounded text-green-600 hover:bg-green-200 dark:hover:bg-green-800" :title="playingSoundbiteIndex === idx ? '暂停' : '播放'">{{ playingSoundbiteIndex === idx ? '⏸' : '▶' }}</button>
+                        <button @click="downloadSoundbite(p)" class="shrink-0 w-4 h-4 flex items-center justify-center rounded text-green-600 hover:bg-green-200 dark:hover:bg-green-800" title="下载">↓</button>
+                        <span class="text-green-700 dark:text-green-400 font-mono">{{ formatTime(p.asrStartTime) }}-{{ formatTime(p.asrEndTime) }}</span>
+                        <span v-if="p.asrConfidence != null && p.asrConfidence > 0" class="text-green-600">{{ (p.asrConfidence * 100).toFixed(0) }}%</span>
+                      </template>
+                    </div>
                     <textarea
                       v-model="p.text"
                       @input="autoResize($event)"
@@ -234,15 +300,52 @@
             </div>
           </div>
 
-          <!-- 报纸模式：文本框 -->
-          <div v-else class="flex-1 flex flex-col min-h-0">
-            <textarea
-              v-model="text"
-              class="flex-1 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              :placeholder="selectedArticle ? '请输入要生成语音的文本' : '请在左侧选择报纸文章'"
-              :disabled="!selectedArticle"
-            ></textarea>
-          </div>
+           <!-- 报纸模式 / 手动输入模式：文本框 -->
+           <div v-else class="flex-1 flex flex-col min-h-0">
+             <!-- 手动模式：图片上传区域 -->
+             <div v-if="newsType === 'manual'" class="shrink-0 mb-3">
+               <div class="flex items-center gap-2 flex-wrap">
+                 <label class="px-3 py-1.5 text-xs rounded-lg border border-dashed border-zinc-300 dark:border-zinc-600 hover:border-blue-400 cursor-pointer text-zinc-500 hover:text-blue-500 transition-colors">
+                   <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                   上传图片
+                   <input type="file" accept="image/*,.pdf" multiple class="hidden" @change="handleImageUpload">
+                 </label>
+                 <button
+                   v-if="manualImages.length > 0"
+                   @click="processImages"
+                   :disabled="ocrProcessing"
+                   class="px-3 py-1.5 text-xs rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-300 text-white font-medium transition-colors"
+                 >
+                   {{ ocrProcessing ? '识别改写中...' : '识别并改写' }}
+                 </button>
+                 <button
+                   v-if="manualImages.length > 0"
+                   @click="clearManualImages"
+                   class="px-3 py-1.5 text-xs rounded-lg text-zinc-400 hover:text-red-500 transition-colors"
+                 >
+                   清空
+                 </button>
+               </div>
+                <div v-if="manualImages.length > 0" class="flex gap-2 mt-2 overflow-x-auto pb-1">
+                  <div v-for="(img, idx) in manualImages" :key="idx" class="relative shrink-0 group">
+                    <img v-if="img.file.type !== 'application/pdf'" :src="img.preview" @click="previewImage = img.preview; previewIsPdf = false" class="h-16 w-16 object-cover rounded-lg border border-zinc-200 dark:border-zinc-700 cursor-pointer hover:opacity-80 transition-opacity" />
+                    <div v-else @click="previewImage = img.preview; previewIsPdf = true" class="h-16 w-16 flex items-center justify-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs text-zinc-400 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors">PDF</div>
+                   <button
+                     @click="removeManualImage(idx)"
+                     class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-500 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                   >
+                     ×
+                   </button>
+                 </div>
+               </div>
+             </div>
+             <textarea
+               v-model="text"
+               class="flex-1 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+               :placeholder="newsType === 'manual' ? '请在此输入或粘贴要生成语音的文本...' : '请在左侧选择报纸文章'"
+               :disabled="newsType === 'newspaper' && !selectedArticle"
+             ></textarea>
+           </div>
 
           <!-- 参数配置 -->
           <div class="mt-3 flex flex-wrap items-center gap-3 text-sm">
@@ -317,7 +420,7 @@
         </div>
 
         <!-- 右侧队列面板 -->
-        <div class="w-80 shrink-0 border-l border-zinc-200 dark:border-zinc-800 p-4 flex flex-col">
+         <div class="w-80 shrink-0 border-l border-zinc-200 dark:border-zinc-800 p-4 flex flex-col">
           <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">生成队列 ({{ queueList.length }})</h3>
           <div class="flex-1 overflow-y-auto space-y-3">
             <div v-if="queueList.length === 0" class="text-xs text-zinc-400 text-center py-4">暂无任务</div>
@@ -384,9 +487,10 @@
             :key="item.id"
             class="p-4 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800"
           >
-            <div class="flex items-start gap-3">
-              <div class="flex-1 min-w-0">
-                <div 
+             <div class="flex items-start gap-3">
+               <div class="flex-1 min-w-0">
+                 <div v-if="item.title" class="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">{{ item.title }}</div>
+                 <div 
                   class="text-sm mb-2"
                   :class="{ 'line-clamp-3': !item.expanded }"
                 >
@@ -412,20 +516,31 @@
                 </div>
               </div>
               
-              <!-- 操作按钮 -->
-              <div class="flex flex-col gap-2">
-                <a
-                  v-if="item.status === 'completed' && getHistoryAudioUrl(item)"
-                  :href="getHistoryAudioUrl(item)"
-                  download
-                  class="p-2 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 text-green-600 dark:text-green-400"
-                  title="下载"
-                >
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                  </svg>
-                </a>
-                <button
+               <!-- 操作按钮 -->
+               <div class="flex flex-col gap-2">
+                 <a
+                   v-if="item.status === 'completed' && getHistoryAudioUrl(item)"
+                   :href="getHistoryAudioUrl(item)"
+                   download
+                   class="p-2 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 text-green-600 dark:text-green-400"
+                   title="下载"
+                 >
+                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                   </svg>
+                 </a>
+                 <button
+                   v-if="item.status === 'completed' && item.voicebox_generation_id && auth.user?.permissions?.includes('broadcast')"
+                   @click="pushToFtp(item)"
+                   :disabled="item._ftpPushing"
+                   class="p-2 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 disabled:opacity-50"
+                   :title="item._ftpPushing ? '推送中...' : '推送到广播FTP'"
+                 >
+                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                   </svg>
+                 </button>
+                 <button
                   @click="confirmDeleteHistory(item)"
                   class="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400"
                   title="删除"
@@ -700,6 +815,95 @@
         </div>
       </div>
     </div>
+    <!-- 用户权限管理弹窗 -->
+    <div
+      v-if="showAdminModal"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      @click.self="showAdminModal = false"
+    >
+       <div class="bg-white dark:bg-zinc-900 rounded-xl p-6 w-[580px] max-h-[85vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold">用户权限管理</h3>
+          <div class="flex items-center gap-2">
+            <button @click="showUserForm = true; editingUser = null; userForm = { username: '', password: '', email: '', role: 'user' }" class="px-3 py-1 text-xs rounded-lg bg-blue-600 hover:bg-blue-700 text-white">新建用户</button>
+            <button @click="showAdminModal = false" class="text-zinc-400 hover:text-zinc-600">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="showUserForm" class="mb-4 p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 space-y-2">
+          <div class="flex gap-2">
+            <input v-model="userForm.username" placeholder="用户名" class="flex-1 rounded border border-zinc-300 dark:border-zinc-600 px-2 py-1 text-sm" />
+            <input v-model="userForm.password" :placeholder="editingUser ? '留空不修改' : '密码'" class="flex-1 rounded border border-zinc-300 dark:border-zinc-600 px-2 py-1 text-sm" />
+          </div>
+          <div class="flex gap-2">
+            <input v-model="userForm.email" placeholder="邮箱（可选）" class="flex-1 rounded border border-zinc-300 dark:border-zinc-600 px-2 py-1 text-sm" />
+            <select v-model="userForm.role" class="w-24 rounded border border-zinc-300 dark:border-zinc-600 px-2 py-1 text-sm">
+              <option value="user">user</option>
+              <option value="admin">admin</option>
+            </select>
+          </div>
+          <div class="flex justify-end gap-2">
+            <button @click="showUserForm = false" class="px-3 py-1 text-xs rounded border border-zinc-300 dark:border-zinc-600">取消</button>
+            <button @click="saveUser" :disabled="userSaving" class="px-3 py-1 text-xs rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50">{{ userSaving ? '保存中...' : editingUser ? '更新' : '创建' }}</button>
+          </div>
+        </div>
+
+        <div v-if="adminLoading" class="text-center py-4 text-zinc-400">加载中...</div>
+        <div v-else class="space-y-2">
+          <div v-for="u in adminUsers" :key="u.id" class="flex items-center justify-between p-3 rounded-lg border border-zinc-200 dark:border-zinc-700">
+            <div>
+              <div class="font-medium text-sm">{{ u.username }} <span v-if="u.role === 'admin'" class="text-xs text-blue-500 ml-1">(admin)</span></div>
+              <div class="text-xs text-zinc-400">{{ u.email || '' }}</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="flex items-center gap-1 text-xs cursor-pointer" v-for="perm in ['broadcast']" :key="perm">
+                <input type="checkbox" :checked="u.permissions.includes(perm)" @change="togglePermission(u, perm)" class="w-3.5 h-3.5" />
+                {{ perm === 'broadcast' ? '广播推送' : perm }}
+              </label>
+              <button @click="editUser(u)" class="text-xs text-blue-500 hover:text-blue-600 ml-1">编辑</button>
+              <button @click="deleteUser(u)" :disabled="u._deleting" class="text-xs text-red-500 hover:text-red-600 ml-1">{{ u._deleting ? '...' : '删除' }}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 图片预览弹窗 -->
+    <div
+      v-if="previewImage"
+      class="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+      @click="previewImage = null"
+    >
+      <img v-if="!previewIsPdf" :src="previewImage" class="max-w-full max-h-full object-contain p-4" />
+      <iframe v-else :src="previewImage" class="w-full h-full border-0"></iframe>
+      <button @click.stop="previewImage = null" class="absolute top-4 right-4 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium z-10 shadow-lg">关闭预览</button>
+    </div>
+
+    <!-- 视频播放弹窗 -->
+    <div
+      v-if="videoPlayerUrl"
+      class="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+      @click="closeVideoPlayer"
+    >
+      <div class="w-[800px] max-w-[90vw] flex flex-col gap-3" @click.stop>
+        <video ref="videoPlayerEl" :src="videoPlayerUrl" controls autoplay class="w-full rounded-lg"></video>
+        <div class="flex items-center gap-2 flex-wrap text-xs text-white bg-zinc-800 rounded-lg px-3 py-2">
+          <span class="text-zinc-400">打点:</span>
+          <button @click="setVideoMarkStart" class="px-2 py-1 rounded bg-green-700 hover:bg-green-600">设起点</button>
+          <button @click="setVideoMarkEnd" class="px-2 py-1 rounded bg-red-700 hover:bg-red-600">设终点</button>
+          <span v-if="videoMarkStart != null" class="font-mono text-green-400">起 {{ formatTime(videoMarkStart) }}</span>
+          <span v-if="videoMarkEnd != null" class="font-mono text-red-400">终 {{ formatTime(videoMarkEnd) }}</span>
+          <button v-if="videoMarkStart != null && videoMarkEnd != null && videoMarkStart < videoMarkEnd" @click="downloadMarkedSegment" class="px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 ml-2">下载起止音频</button>
+          <button v-if="videoMarkStart != null || videoMarkEnd != null" @click="resetVideoMarks" class="px-2 py-1 rounded text-zinc-400 hover:text-white ml-auto">重置</button>
+        </div>
+      </div>
+      <button @click="closeVideoPlayer" class="absolute top-4 right-4 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium z-10 shadow-lg">关闭</button>
+    </div>
+
   </div>
 </template>
 
@@ -707,13 +911,15 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { fetchProfiles, generateSpeech, getGenerationStatus, fetchModels, downloadModel, loadModel, createProfile, uploadProfileSample, deleteProfile, fetchAvailableEffects, fetchProfileEffects, updateProfileEffects, fetchPresetVoices, createAudioRecord, listAudioRecords, deleteAudioRecord, type AvailableEffect, type EffectConfig } from '@/api'
 import { fetchPaperArticles, fetchTvNewsLists, fetchTvNewsDetail, fetchTvArticle, fetchArticleDetail } from '@/api'
+import { fetchAdminUsers, grantPermission, revokePermission, createUser, updateUser, deleteUser } from '@/api'
+import { NEWSPAPER_SITE_ID, NEWSPAPER_DOC_STATUS, TV_COLUMN_ID, SHOW_TV_NEWS } from '@/config'
 import { useAuth } from '@/composables/useAuth'
 import { listQueueTasks, submitQueueTask } from '@/api/queue'
 
 const auth = useAuth()
 
 const activeTab = ref<'generate' | 'history'>('generate')
-const newsType = ref<'newspaper' | 'tv'>('newspaper')
+const newsType = ref<'newspaper' | 'tv' | 'manual'>('newspaper')
 const articles = ref<any[]>([])
 const articlesLoading = ref(false)
 const selectedArticle = ref<any>(null)
@@ -733,6 +939,7 @@ const selectedProfileName = ref<string | null>(null)
 const showModelsModal = ref(false)
 
 const text = ref('')
+const title = ref('')
 const language = ref('zh')
 const selectedModel = ref('')
 const selectedVoiceId = ref<string>('')
@@ -757,6 +964,29 @@ const showEffectsModal = ref(false)
 const availableEffects = ref<AvailableEffect[]>([])
 const profileEffects = ref<EffectConfig[]>([])
 const effectsLoading = ref(false)
+const manualImages = ref<{ file: File; preview: string }[]>([])
+const ocrProcessing = ref(false)
+const previewImage = ref<string | null>(null)
+const previewIsPdf = ref(false)
+const videoSearching = ref(false)
+const videoSearched = ref(false)
+const videoResults = ref<any[]>([])
+const videoPlayerUrl = ref<string | null>(null)
+const videoPlayerEl = ref<HTMLVideoElement | null>(null)
+const videoMarkStart = ref<number | null>(null)
+const videoMarkEnd = ref<number | null>(null)
+const selectedVideoIndex = ref<number | null>(null)
+const asrAligning = ref(false)
+const asrResults = ref<any[]>([])
+const soundbiteAudio = ref<HTMLAudioElement | null>(null)
+const playingSoundbiteIndex = ref<number | null>(null)
+const showAdminModal = ref(false)
+const adminUsers = ref<any[]>([])
+const adminLoading = ref(false)
+const showUserForm = ref(false)
+const editingUser = ref<any>(null)
+const userSaving = ref(false)
+const userForm = ref({ username: '', password: '', email: '', role: 'user' })
 
 const effectLabels: Record<string, string> = {
   chorus: '合唱/镶边',
@@ -832,6 +1062,9 @@ interface TvParagraph {
   checked: boolean
   isLabel?: boolean
   label?: string
+  asrStartTime?: number
+  asrEndTime?: number
+  asrConfidence?: number
 }
 const tvParagraphs = ref<TvParagraph[]>([])
 const tvNewsItemsLoading = ref(false)
@@ -853,6 +1086,221 @@ function todayStr() {
     String(beijing.getDate()).padStart(2, '0')
 }
 
+async function searchVideo() {
+  const articleTitle = selectedArticle.value?.title || selectedArticle.value?.TITLE
+  if (!articleTitle) return
+  videoSearching.value = true
+  videoSearched.value = false
+  videoResults.value = []
+  try {
+    const res = await fetch('/voicebox-web/articles/search-video', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: articleTitle })
+    })
+    if (!res.ok) throw new Error('搜索失败')
+    const data = await res.json()
+    videoResults.value = Array.isArray(data) ? data : (data.data || [])
+    videoSearched.value = true
+  } catch (e: any) {
+    showToast(e.message || '视频搜索失败', 'error')
+  } finally {
+    videoSearching.value = false
+  }
+}
+
+async function fetchSoundbiteAlignment() {
+  const idx = selectedVideoIndex.value
+  if (idx === null) return
+  const v = videoResults.value[idx]
+  if (!v) return
+  const mp4 = (v.file_paths || []).find((p: string) => p.endsWith('.mp4'))
+  if (!mp4) { showToast('视频无可播放的 mp4 文件', 'error'); return }
+  const manuscript = tvParagraphs.value.map(p => p.isLabel ? p.text : (p.label ? p.label + '\n' + p.text : p.text)).join('\n')
+  asrAligning.value = true
+  asrResults.value = []
+  try {
+    const res = await fetch('/voicebox-web/asr/align', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ video_url: mp4, manuscript })
+    })
+    if (!res.ok) {
+      const err = await res.json()
+      throw new Error(err.detail || '对齐失败')
+    }
+    const data = await res.json()
+    const segments = data.segments || []
+    asrResults.value = segments
+    // Assign to 【同期声】 paragraphs
+    const sbParagraphs = tvParagraphs.value.filter(p => !p.isLabel && p.label === '【同期声】')
+    segments.forEach((seg: any, i: number) => {
+      if (i < sbParagraphs.length) {
+        sbParagraphs[i].asrStartTime = seg.start_time
+        sbParagraphs[i].asrEndTime = seg.end_time
+        sbParagraphs[i].asrConfidence = seg.confidence
+      }
+    })
+    if (asrResults.value.length === 0) showToast('未找到同期声匹配结果', 'warning')
+  } catch (e: any) {
+    showToast(e.message || 'ASR对齐失败', 'error')
+  } finally {
+    asrAligning.value = false
+  }
+}
+
+function playVideo(v: any) {
+  const mp4 = (v.file_paths || []).find((p: string) => p.endsWith('.mp4'))
+  if (mp4) {
+    resetVideoMarks()
+    videoPlayerUrl.value = mp4
+  }
+}
+function closeVideoPlayer() {
+  videoPlayerUrl.value = null
+  resetVideoMarks()
+}
+function setVideoMarkStart() {
+  if (videoPlayerEl.value) videoMarkStart.value = videoPlayerEl.value.currentTime
+}
+function setVideoMarkEnd() {
+  if (videoPlayerEl.value) videoMarkEnd.value = videoPlayerEl.value.currentTime
+}
+function resetVideoMarks() {
+  videoMarkStart.value = null
+  videoMarkEnd.value = null
+}
+async function downloadMarkedSegment() {
+  if (videoMarkStart.value == null || videoMarkEnd.value == null) return
+  if (videoMarkStart.value >= videoMarkEnd.value) return
+  const url = videoPlayerUrl.value
+  if (!url) return
+  try {
+    const response = await fetch(url)
+    const arrayBuffer = await response.arrayBuffer()
+    const audioCtx = new AudioContext()
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer)
+    const sampleRate = audioBuffer.sampleRate
+    const duration = videoMarkEnd.value - videoMarkStart.value
+    const offlineCtx = new OfflineAudioContext(
+      audioBuffer.numberOfChannels,
+      Math.ceil(duration * sampleRate),
+      sampleRate
+    )
+    const source = offlineCtx.createBufferSource()
+    source.buffer = audioBuffer
+    source.connect(offlineCtx.destination)
+    source.start(0, videoMarkStart.value, duration)
+    const rendered = await offlineCtx.startRendering()
+    const wavBlob = audioBufferToWav(rendered)
+    const blobUrl = URL.createObjectURL(wavBlob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = `clip_${formatTime(videoMarkStart.value).replace(':', '-')}_${formatTime(videoMarkEnd.value).replace(':', '-')}.wav`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(blobUrl)
+    audioCtx.close()
+    showToast('音频片段已下载', 'success')
+  } catch (e: any) {
+    showToast('下载失败: ' + e.message, 'error')
+  }
+}
+function getSelectedVideoMp4(): string | null {
+  const idx = selectedVideoIndex.value
+  if (idx === null) return null
+  const v = videoResults.value[idx]
+  if (!v) return null
+  return (v.file_paths || []).find((p: string) => p.endsWith('.mp4')) || null
+}
+function toggleSoundbite(p: TvParagraph) {
+  const idx = tvParagraphs.value.indexOf(p)
+  if (playingSoundbiteIndex.value === idx && soundbiteAudio.value) {
+    // Pause currently playing segment
+    soundbiteAudio.value.pause()
+    soundbiteAudio.value = null
+    playingSoundbiteIndex.value = null
+    return
+  }
+  if (p.asrStartTime == null || p.asrEndTime == null) return
+  const mp4 = getSelectedVideoMp4()
+  if (!mp4) return
+  if (soundbiteAudio.value) {
+    soundbiteAudio.value.pause()
+  }
+  const audio = new Audio(mp4)
+  soundbiteAudio.value = audio
+  playingSoundbiteIndex.value = idx
+  audio.currentTime = p.asrStartTime
+  audio.play().catch(() => {})
+  const duration = p.asrEndTime - p.asrStartTime
+  setTimeout(() => {
+    if (soundbiteAudio.value === audio) {
+      audio.pause()
+      playingSoundbiteIndex.value = null
+    }
+  }, duration * 1000 + 500)
+}
+async function downloadSoundbite(p: TvParagraph) {
+  if (p.asrStartTime == null || p.asrEndTime == null) return
+  const mp4 = getSelectedVideoMp4()
+  if (!mp4) return
+  try {
+    const response = await fetch(mp4)
+    const arrayBuffer = await response.arrayBuffer()
+    const audioCtx = new AudioContext()
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer)
+    const sampleRate = audioBuffer.sampleRate
+    const duration = p.asrEndTime - p.asrStartTime
+    const offlineCtx = new OfflineAudioContext(
+      audioBuffer.numberOfChannels,
+      Math.ceil(duration * sampleRate),
+      sampleRate
+    )
+    const source = offlineCtx.createBufferSource()
+    source.buffer = audioBuffer
+    source.connect(offlineCtx.destination)
+    source.start(0, p.asrStartTime, duration)
+    const rendered = await offlineCtx.startRendering()
+    const wavBlob = audioBufferToWav(rendered)
+    const url = URL.createObjectURL(wavBlob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `soundbite_${formatTime(p.asrStartTime).replace(':', '-')}_${formatTime(p.asrEndTime).replace(':', '-')}.wav`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    audioCtx.close()
+  } catch (e: any) {
+    showToast('下载片段失败: ' + e.message, 'error')
+  }
+}
+function audioBufferToWav(buffer: AudioBuffer): Blob {
+  const numChannels = buffer.numberOfChannels
+  const sampleRate = buffer.sampleRate
+  const dataSize = buffer.length * numChannels * 2
+  const arrayBuffer = new ArrayBuffer(44 + dataSize)
+  const view = new DataView(arrayBuffer)
+  const w = (o: number, s: string) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)) }
+  w(0, 'RIFF'); view.setUint32(4, 36 + dataSize, true)
+  w(8, 'WAVE'); w(12, 'fmt ')
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true)
+  view.setUint16(22, numChannels, true); view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * numChannels * 2, true)
+  view.setUint16(32, numChannels * 2, true); view.setUint16(34, 16, true)
+  w(36, 'data'); view.setUint32(40, dataSize, true)
+  let o = 44
+  for (let i = 0; i < buffer.length; i++) {
+    for (let ch = 0; ch < numChannels; ch++) {
+      const s = Math.max(-1, Math.min(1, buffer.getChannelData(ch)[i]))
+      view.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7FFF, true)
+      o += 2
+    }
+  }
+  return new Blob([arrayBuffer], { type: 'audio/wav' })
+}
 function selectAllTvParagraphs() {
   const contentParagraphs = tvParagraphs.value.filter(p => !p.isLabel)
   const allChecked = contentParagraphs.every(p => p.checked)
@@ -939,6 +1387,98 @@ async function confirmDeleteHistory(item: any) {
     }
   } catch (err: any) {
     alert('删除失败: ' + err.message)
+  }
+}
+
+async function pushToFtp(item: any) {
+  const gid = item.voicebox_generation_id
+  if (!gid) return
+  item._ftpPushing = true
+  try {
+    const token = localStorage.getItem('voicebox_token')
+    const res = await fetch(`/voicebox-web/articles/push-ftp/${gid}`, {
+      method: 'POST',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '推送失败' }))
+      throw new Error(err.detail || '推送失败')
+    }
+    showToast('已推送到广播FTP', 'success')
+  } catch (err: any) {
+    showToast(err.message || 'FTP推送失败', 'error')
+  } finally {
+    item._ftpPushing = false
+  }
+}
+
+async function loadAdminUsers() {
+  adminLoading.value = true
+  try {
+    adminUsers.value = await fetchAdminUsers()
+  } catch (e: any) {
+    showToast(e.message || '加载失败', 'error')
+  } finally {
+    adminLoading.value = false
+  }
+}
+
+async function togglePermission(u: any, perm: string) {
+  try {
+    if (u.permissions.includes(perm)) {
+      await revokePermission(u.id, perm)
+      u.permissions = u.permissions.filter((p: string) => p !== perm)
+    } else {
+      await grantPermission(u.id, perm)
+      u.permissions.push(perm)
+    }
+  } catch (e: any) {
+    showToast(e.message || '操作失败', 'error')
+  }
+}
+
+async function saveUser() {
+  if (!userForm.value.username) return showToast('请输入用户名', 'error')
+  if (!editingUser.value && !userForm.value.password) return showToast('请输入密码', 'error')
+  userSaving.value = true
+  try {
+    if (editingUser.value) {
+      const data: any = {}
+      if (userForm.value.password) data.password = userForm.value.password
+      data.email = userForm.value.email || null
+      data.role = userForm.value.role
+      await updateUser(editingUser.value.id, data)
+      showToast('用户已更新', 'success')
+    } else {
+      await createUser(userForm.value)
+      showToast('用户已创建', 'success')
+    }
+    showUserForm.value = false
+    await loadAdminUsers()
+  } catch (e: any) {
+    showToast(e.message || '操作失败', 'error')
+  } finally {
+    userSaving.value = false
+  }
+}
+
+function editUser(u: any) {
+  editingUser.value = u
+  userForm.value = { username: u.username, password: '', email: u.email || '', role: u.role }
+  showUserForm.value = true
+}
+
+async function deleteUser(u: any) {
+  if (!confirm(`确定删除用户 "${u.username}"？`)) return
+  u._deleting = true
+  try {
+    await deleteUser(u.id)
+    showToast('用户已删除', 'success')
+    await loadAdminUsers()
+  } catch (e: any) {
+    showToast(e.message || '删除失败', 'error')
+  } finally {
+    u._deleting = false
   }
 }
 
@@ -1078,6 +1618,10 @@ async function startRecording() {
     
     const sp = audioContext.value.createScriptProcessor(4096, 1, 1)
     source.connect(sp)
+    const zeroGain = audioContext.value.createGain()
+    zeroGain.gain.value = 0
+    sp.connect(zeroGain)
+    zeroGain.connect(audioContext.value.destination)
     scriptProcessor.value = sp
     
     audioChunks.value = []
@@ -1149,7 +1693,7 @@ function createWavBlob(chunks: Float32Array[], sampleRate: number): Blob {
   view.setUint16(20, 1, true)
   view.setUint16(22, 1, true)
   view.setUint32(24, sampleRate, true)
-  view.setUint32(28, sampleRate * numChannels * (bitsPerSample / 8), true)
+   view.setUint32(28, sampleRate * 2, true)
   view.setUint16(32, 2, true)
   view.setUint16(34, 16, true)
   writeString(36, 'data')
@@ -1175,6 +1719,7 @@ async function loadHistory() {
       ...item,
       expanded: false,
       audio_path: item.audio_url || null,
+      title: item.title || '',
     }))
   } catch (err) {
     console.error('Failed to load history:', err)
@@ -1338,13 +1883,14 @@ async function checkBackend() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await auth.initAuth()
   loadProfiles()
   loadHistory()
   loadArticles()
   loadModels()
   checkBackend()
-  setInterval(checkBackend, 30000)
+  setInterval(checkBackend, 120000)
   fetchQueueList()
   setInterval(fetchQueueList, 30000)
 })
@@ -1366,7 +1912,7 @@ async function loadArticles() {
   error.value = null
   try {
     if (newsType.value === 'newspaper') {
-      const res = await fetchPaperArticles({ siteId: '111', docstatus: '38', beginDate: beginDate.value, endDate: endDate.value })
+      const res = await fetchPaperArticles({ siteId: NEWSPAPER_SITE_ID, docstatus: NEWSPAPER_DOC_STATUS, beginDate: beginDate.value, endDate: endDate.value })
       const seen = new Set()
       articles.value = (res || []).filter((article: any) => {
         const id = article.METADATAID
@@ -1379,7 +1925,7 @@ async function loadArticles() {
       const nextDay = new Date(beginDate.value)
       nextDay.setDate(nextDay.getDate() + 1)
       const endDate = nextDay.toISOString().split('T')[0]
-      const res = await fetchTvNewsLists(startDate, endDate, '590f6b165afa45f1bd8fc1ed31756fb7')
+      const res = await fetchTvNewsLists(startDate, endDate, TV_COLUMN_ID)
       const lists = res.data || []
       
       const allItems: any[] = []
@@ -1418,9 +1964,16 @@ async function handleArticleClick(article: any) {
   currentAudio.value = null
   currentAudioBlob.value = null
   success.value = false
+  title.value = article.TITLE || article.title || ''
   
   if (newsType.value === 'tv') {
     text.value = ''
+    videoResults.value = []
+    videoSearched.value = false
+    selectedVideoIndex.value = null
+    asrResults.value = []
+    if (soundbiteAudio.value) { soundbiteAudio.value.pause(); soundbiteAudio.value = null }
+    playingSoundbiteIndex.value = null
     tvParagraphs.value = [{ text: '加载中...', checked: true }]
     try {
       const res = await fetchTvArticle(article.docid.toString())
@@ -1519,6 +2072,7 @@ async function handleGenerate() {
     const engine = getEngine(selectedModel.value)
     const req: any = {
       text: targetText.trim(),
+      title: title.value.trim() || undefined,
       language: language.value,
       engine: engine,
       instruct: tone.value || undefined,
@@ -1555,17 +2109,23 @@ function handleStop() {
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
-  const s = seconds % 60
+  const s = Math.round(seconds) % 60
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
 watch(newsType, () => {
-  loadArticles()
+  if (newsType.value !== 'manual') {
+    loadArticles()
+    clearManualImages()
+  }
   text.value = ''
+  title.value = ''
   tvParagraphs.value = []
   selectedArticle.value = null
   currentAudio.value = null
   currentAudioBlob.value = null
+  videoResults.value = []
+  videoSearched.value = false
 })
 
 watch(text, () => {
@@ -1582,4 +2142,55 @@ watch(models, () => {
     selectedModel.value = loaded?.model_name || models.value[0]?.model_name || ''
   }
 })
+
+function handleImageUpload(event: Event) {
+  const input = event.target as HTMLInputElement
+  if (!input.files) return
+  for (const file of Array.from(input.files)) {
+    if (!file.type.startsWith('image/') && file.type !== 'application/pdf') continue
+    manualImages.value.push({
+      file,
+      preview: URL.createObjectURL(file),
+    })
+  }
+  input.value = ''
+}
+
+function removeManualImage(idx: number) {
+  URL.revokeObjectURL(manualImages.value[idx].preview)
+  manualImages.value.splice(idx, 1)
+}
+
+function clearManualImages() {
+  manualImages.value.forEach(img => URL.revokeObjectURL(img.preview))
+  manualImages.value = []
+}
+
+async function processImages() {
+  if (manualImages.value.length === 0) return
+  ocrProcessing.value = true
+  try {
+    const formData = new FormData()
+    manualImages.value.forEach(img => formData.append('files', img.file))
+    const res = await fetch('/voicebox-web/articles/ocr-rewrite', {
+      method: 'POST',
+      body: formData,
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '处理失败' }))
+      throw new Error(err.detail || '处理失败')
+    }
+    const data = await res.json()
+    if (data.article) {
+      text.value = data.article
+      showToast('识别改写完成', 'success')
+    } else if (data.warning) {
+      showToast(data.warning, 'info')
+    }
+  } catch (err: any) {
+    showToast(err.message || '图片处理失败', 'error')
+  } finally {
+    ocrProcessing.value = false
+  }
+}
 </script>
