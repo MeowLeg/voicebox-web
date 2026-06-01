@@ -170,6 +170,11 @@ class QueueWorker:
                             try:
                                 status_data = json.loads(data_str)
                                 gen_status = status_data.get("status", gen_status)
+                                gen_progress = status_data.get("progress")
+                                if gen_progress is not None:
+                                    task.progress = max(task.progress, float(gen_progress))
+                                    task.updated_at = datetime.now(timezone.utc)
+                                    db.commit()
                             except json.JSONDecodeError:
                                 continue
 

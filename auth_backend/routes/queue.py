@@ -60,16 +60,17 @@ def submit_task(
 
 @router.get("/tasks")
 def list_tasks(
+    user: User = Depends(get_current_user),
     status: str = None,
     limit: int = 50,
     user_id: str = None,
     db: Session = Depends(get_db),
 ):
+    effective_user_id = user_id if user_id and user.role == 'admin' else user.id
     query = db.query(QueueTask)
+    query = query.filter(QueueTask.user_id == effective_user_id)
     if status:
         query = query.filter(QueueTask.status == status)
-    if user_id:
-        query = query.filter(QueueTask.user_id == user_id)
     tasks = (
         query.order_by(QueueTask.created_at.asc())
         .limit(limit)
@@ -77,15 +78,18 @@ def list_tasks(
     )
 
     total = db.query(QueueTask).filter(
+        QueueTask.user_id == effective_user_id,
         QueueTask.status.in_(["pending", "processing"])
     ).count()
 
     # Calculate position for each pending task
     pending_tasks = db.query(QueueTask).filter(
+        QueueTask.user_id == effective_user_id,
         QueueTask.status == "pending"
     ).order_by(QueueTask.created_at.asc()).all()
     pending_positions = {t.id: i + 1 for i, t in enumerate(pending_tasks)}
     processing_count = db.query(QueueTask).filter(
+        QueueTask.user_id == effective_user_id,
         QueueTask.status == "processing"
     ).count()
 

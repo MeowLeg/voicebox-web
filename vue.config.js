@@ -43,6 +43,20 @@ module.exports = {
           proxyReq.path = req.url.replace(/^\/voicebox-web/, '');
         }
       },
+      '/voicebox-web/articles/broadcast-audio': {
+        target: authTarget,
+        changeOrigin: true,
+        onProxyReq: (proxyReq, req) => {
+          proxyReq.path = req.url.replace(/^\/voicebox-web/, '');
+        }
+      },
+      '/voicebox-web/articles/broadcast-rewrite': {
+        target: authTarget,
+        changeOrigin: true,
+        onProxyReq: (proxyReq, req) => {
+          proxyReq.path = req.url.replace(/^\/voicebox-web/, '');
+        }
+      },
       '/voicebox-web/articles': {
         target: articlesTarget,
         changeOrigin: true,

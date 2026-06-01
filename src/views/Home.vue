@@ -78,7 +78,7 @@
 
      <main class="flex-1 max-w-[100rem] w-full mx-auto px-6 py-6 flex gap-6">
       <!-- 新闻生成标签页 -->
-      <div v-show="activeTab === 'generate'">
+      <div v-show="activeTab === 'generate'" class="flex-1 min-w-0">
 
         <div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 flex overflow-hidden" style="height: calc(100vh - 180px)">
         
@@ -223,7 +223,26 @@
             <div v-else-if="tvParagraphs.length === 0" class="flex-1 flex items-center justify-center text-zinc-400 text-sm">
               请在左侧选择电视新闻稿件
             </div>
-            <div v-else class="flex-1 overflow-y-auto space-y-2 pr-2">
+            <div v-else class="flex flex-col min-h-0">
+            <!-- 视图切换 -->
+            <div v-if="broadcastParagraphs.length > 0" class="flex gap-1 mb-2 shrink-0">
+              <button
+                @click="broadcastTab = 'tv'"
+                :class="['text-xs px-3 py-1 rounded transition-colors',
+                  broadcastTab === 'tv'
+                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium'
+                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700']"
+              >电视稿</button>
+              <button
+                @click="broadcastTab = 'broadcast'"
+                :class="['text-xs px-3 py-1 rounded transition-colors',
+                  broadcastTab === 'broadcast'
+                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium'
+                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700']"
+              >广播稿</button>
+            </div>
+            <!-- 电视稿 -->
+            <div v-show="broadcastTab !== 'broadcast' || broadcastParagraphs.length === 0" class="flex-1 overflow-y-auto space-y-2 pr-2">
                <div class="flex items-center gap-2 mb-2">
                  <button
                    @click="selectAllTvParagraphs"
@@ -232,14 +251,22 @@
                    {{ tvParagraphs.filter(p => !p.isLabel).every(p => p.checked) ? '取消全选' : '全选' }}
                  </button>
                  <button
-                   v-if="selectedArticle"
-                   @click="searchVideo"
-                   :disabled="videoSearching"
-                   class="text-xs px-2 py-1 rounded bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-400"
-                 >
-                   {{ videoSearching ? '搜索中...' : '搜索视频' }}
-                 </button>
-                 <span class="text-xs text-zinc-400">
+                    v-if="tvParagraphs.length > 0"
+                    @click="rewriteBroadcast"
+                    :disabled="broadcastRewriting"
+                    class="text-xs px-2 py-1 rounded bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-400"
+                  >
+                    {{ broadcastRewriting ? '改写中...' : '广播稿改写' }}
+                  </button>
+                  <button
+                    v-if="selectedArticle"
+                    @click="searchVideo"
+                    :disabled="videoSearching"
+                    class="text-xs px-2 py-1 rounded bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-400"
+                  >
+                    {{ videoSearching ? '搜索中...' : '搜索视频' }}
+                  </button>
+                  <span class="text-xs text-zinc-400">
                    已选中 {{ checkedTvParagraphs.length }} 段，共 {{ getCheckedTvText.length }} 字符
                  </span>
                </div>
@@ -285,7 +312,29 @@
                       <template v-if="p.asrStartTime != null">
                         <button @click="toggleSoundbite(p)" class="shrink-0 w-4 h-4 flex items-center justify-center rounded text-green-600 hover:bg-green-200 dark:hover:bg-green-800" :title="playingSoundbiteIndex === idx ? '暂停' : '播放'">{{ playingSoundbiteIndex === idx ? '⏸' : '▶' }}</button>
                         <button @click="downloadSoundbite(p)" class="shrink-0 w-4 h-4 flex items-center justify-center rounded text-green-600 hover:bg-green-200 dark:hover:bg-green-800" title="下载">↓</button>
-                        <span class="text-green-700 dark:text-green-400 font-mono">{{ formatTime(p.asrStartTime) }}-{{ formatTime(p.asrEndTime) }}</span>
+                        <!-- 起始时间 -->
+                        <span class="inline-flex items-center gap-px">
+                          <button @click="nudgeAsr(p, 'start', -1)" class="shrink-0 w-3 h-3 flex items-center justify-center rounded text-[9px] leading-none text-green-600 hover:bg-green-200 dark:hover:bg-green-800" title="-1s">−</button>
+                          <input
+                            type="text"
+                            :value="formatTime(p.asrStartTime!)"
+                            @change="applyAsrTime(p, 'start', ($event.target as HTMLInputElement).value)"
+                            class="w-10 text-center font-mono text-green-700 dark:text-green-400 bg-transparent border border-transparent hover:border-green-300 dark:hover:border-green-700 focus:border-green-400 focus:outline-none rounded px-0.5 text-xs"
+                          />
+                          <button @click="nudgeAsr(p, 'start', 1)" class="shrink-0 w-3 h-3 flex items-center justify-center rounded text-[9px] leading-none text-green-600 hover:bg-green-200 dark:hover:bg-green-800" title="+1s">+</button>
+                        </span>
+                        <span class="text-green-700 dark:text-green-400 font-mono text-xs">-</span>
+                        <!-- 结束时间 -->
+                        <span class="inline-flex items-center gap-px">
+                          <button @click="nudgeAsr(p, 'end', -1)" class="shrink-0 w-3 h-3 flex items-center justify-center rounded text-[9px] leading-none text-green-600 hover:bg-green-200 dark:hover:bg-green-800" title="-1s">−</button>
+                          <input
+                            type="text"
+                            :value="formatTime(p.asrEndTime!)"
+                            @change="applyAsrTime(p, 'end', ($event.target as HTMLInputElement).value)"
+                            class="w-10 text-center font-mono text-green-700 dark:text-green-400 bg-transparent border border-transparent hover:border-green-300 dark:hover:border-green-700 focus:border-green-400 focus:outline-none rounded px-0.5 text-xs"
+                          />
+                          <button @click="nudgeAsr(p, 'end', 1)" class="shrink-0 w-3 h-3 flex items-center justify-center rounded text-[9px] leading-none text-green-600 hover:bg-green-200 dark:hover:bg-green-800" title="+1s">+</button>
+                        </span>
                         <span v-if="p.asrConfidence != null && p.asrConfidence > 0" class="text-green-600">{{ (p.asrConfidence * 100).toFixed(0) }}%</span>
                       </template>
                     </div>
@@ -297,6 +346,61 @@
                   </div>
                 </div>
               </template>
+            </div>
+            <!-- 广播稿 -->
+            <div v-show="broadcastParagraphs.length > 0 && broadcastTab === 'broadcast'" class="flex-1 overflow-y-auto pr-1">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-amber-600 dark:text-amber-400">📻 广播稿预览</h3>
+                <div class="flex items-center gap-2">
+                  <button
+                    @click="generateBroadcastAudio"
+                    :disabled="broadcastGenerating"
+                    class="text-xs px-3 py-1 rounded bg-amber-500 hover:bg-amber-600 disabled:bg-zinc-300 text-white font-medium transition-colors"
+                  >{{ broadcastGenerating ? '生成中...' : '生成广播稿音频' }}</button>
+                  <button @click="broadcastParagraphs = []" class="text-xs text-zinc-400 hover:text-red-500">关闭</button>
+                </div>
+              </div>
+              <div class="space-y-2">
+                <template v-for="(p, idx) in broadcastParagraphs" :key="idx">
+                  <div>
+                    <!-- 同期声 -->
+                    <div v-if="p.asrStartTime != null" class="flex items-start gap-2 p-2 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                      <div class="flex flex-col gap-px shrink-0 mt-0.5">
+                        <button @click="moveBroadcastParagraph(idx, -1)" :disabled="idx === 0" class="w-4 h-3 flex items-center justify-center rounded text-[8px] leading-none text-zinc-400 hover:bg-green-200 dark:hover:bg-green-800 disabled:opacity-30" title="上移">▲</button>
+                        <button @click="moveBroadcastParagraph(idx, 1)" :disabled="idx === broadcastParagraphs.length - 1" class="w-4 h-3 flex items-center justify-center rounded text-[8px] leading-none text-zinc-400 hover:bg-green-200 dark:hover:bg-green-800 disabled:opacity-30" title="下移">▼</button>
+                      </div>
+                      <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2 mb-0.5">
+                          <span class="text-[10px] font-mono text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/40 px-1 rounded">{{ formatTime(p.asrStartTime!) }}-{{ formatTime(p.asrEndTime!) }}</span>
+                          <span class="text-[10px] text-green-600">{{ (p.asrConfidence! * 100).toFixed(0) }}%</span>
+                          <button @click="toggleBroadcastSoundbite(p)" class="shrink-0 w-3 h-3 flex items-center justify-center rounded text-[9px] text-green-600 hover:bg-green-200 dark:hover:bg-green-800" title="试听">▶</button>
+                          <button @click="broadcastParagraphs.splice(idx, 1)" class="shrink-0 w-3 h-3 flex items-center justify-center rounded text-[9px] text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 ml-auto" title="删除">×</button>
+                        </div>
+                        <div class="text-xs text-green-800 dark:text-green-200">{{ p.text }}</div>
+                      </div>
+                    </div>
+                    <!-- 正文 -->
+                    <div v-else class="flex items-start gap-2 p-2 rounded bg-zinc-50 dark:bg-zinc-800">
+                      <div class="flex flex-col gap-px shrink-0 mt-0.5">
+                        <button @click="moveBroadcastParagraph(idx, -1)" :disabled="idx === 0" class="w-4 h-3 flex items-center justify-center rounded text-[8px] leading-none text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-30" title="上移">▲</button>
+                        <button @click="moveBroadcastParagraph(idx, 1)" :disabled="idx === broadcastParagraphs.length - 1" class="w-4 h-3 flex items-center justify-center rounded text-[8px] leading-none text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-30" title="下移">▼</button>
+                      </div>
+                      <span class="text-xs font-medium text-zinc-400 dark:text-zinc-500 shrink-0 mt-1">📝</span>
+                      <textarea
+                        v-model="p.text"
+                        @input="autoResize($event)"
+                        class="tv-textarea flex-1 min-h-[40px] rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none overflow-hidden"
+                      ></textarea>
+                      <button @click="broadcastParagraphs.splice(idx, 1)" class="shrink-0 w-4 h-4 flex items-center justify-center rounded text-xs text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 self-start mt-1" title="删除">×</button>
+                    </div>
+                  </div>
+                </template>
+                <button
+                  @click="broadcastParagraphs.push({ text: '', checked: false })"
+                  class="mt-2 text-xs px-3 py-1.5 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-600 text-zinc-400 hover:text-blue-500 hover:border-blue-400 transition-colors w-full"
+                >+ 添加正文</button>
+              </div>
+            </div>
             </div>
           </div>
 
@@ -404,7 +508,7 @@
            <!-- 音频播放 -->
           <div v-if="currentAudio || currentAudioBlob" class="mt-3 flex items-center gap-3">
             <audio v-if="currentAudio" :src="currentAudio" controls class="flex-1"></audio>
-            <audio v-else-if="currentAudioBlob" :src="URL.createObjectURL(currentAudioBlob)" controls class="flex-1"></audio>
+            <audio v-else-if="currentAudioBlob" :src="currentAudioBlobUrl" controls class="flex-1"></audio>
             <a
               v-if="currentAudio"
               :href="currentAudio"
@@ -424,6 +528,9 @@
           <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">生成队列 ({{ queueList.length }})</h3>
           <div class="flex-1 overflow-y-auto space-y-3">
             <div v-if="queueList.length === 0" class="text-xs text-zinc-400 text-center py-4">暂无任务</div>
+            <div v-if="queueError" class="text-xs text-red-500 text-center py-2 px-2 bg-red-50 dark:bg-red-900/20 rounded-lg">
+              {{ queueError }}
+            </div>
             <div
               v-for="task in queueList"
               :key="task.id"
@@ -462,7 +569,7 @@
           <div class="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-700">
             <button
               @click="handleGenerate"
-              :disabled="(currentModelSupportsClone ? !selectedProfile : !selectedVoiceId) || (newsType === 'tv' ? getCheckedTvText.length === 0 : !text.trim()) || backendOnline === false"
+              :disabled="(currentModelSupportsClone ? !selectedProfile : !selectedVoiceId) || (broadcastParagraphs.length > 0 && broadcastTab === 'broadcast' ? getBroadcastText.length === 0 : (newsType === 'tv' ? getCheckedTvText.length === 0 : !text.trim())) || backendOnline === false"
               class="w-full px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-300 disabled:cursor-not-allowed text-white font-medium transition-colors text-sm"
             >
               添加到队列
@@ -954,11 +1061,18 @@ const statusText = ref('')
 const elapsedTime = ref(0)
 const currentAudio = ref<string | null>(null)
 const currentAudioBlob = ref<Blob | null>(null)
+const currentAudioBlobUrl = computed(() => {
+  if (currentAudioBlob.value) {
+    return URL.createObjectURL(currentAudioBlob.value)
+  }
+  return null
+})
 const success = ref(false)
 const backendOnline = ref<boolean | null>(null)
 const loadingFromHistory = ref(false)
 const showCreateProfileModal = ref(false)
 const queueList = ref<any[]>([])
+const queueError = ref<string | null>(null)
 const creatingProfile = ref(false)
 const showEffectsModal = ref(false)
 const availableEffects = ref<AvailableEffect[]>([])
@@ -978,6 +1092,10 @@ const videoMarkEnd = ref<number | null>(null)
 const selectedVideoIndex = ref<number | null>(null)
 const asrAligning = ref(false)
 const asrResults = ref<any[]>([])
+const broadcastRewriting = ref(false)
+const broadcastParagraphs = ref<TvParagraph[]>([])
+const broadcastTab = ref<'tv' | 'broadcast'>('tv')
+const broadcastGenerating = ref(false)
 const soundbiteAudio = ref<HTMLAudioElement | null>(null)
 const playingSoundbiteIndex = ref<number | null>(null)
 const showAdminModal = ref(false)
@@ -1075,6 +1193,13 @@ const checkedTvParagraphs = computed(() => {
 
 const getCheckedTvText = computed(() => {
   return checkedTvParagraphs.value.map(p => p.text.trim()).join('\n')
+})
+
+const getBroadcastText = computed(() => {
+  return broadcastParagraphs.value
+    .filter(p => p.asrStartTime == null && p.text.trim())
+    .map(p => p.text.trim())
+    .join('\n')
 })
 
 function todayStr() {
@@ -1305,6 +1430,118 @@ function selectAllTvParagraphs() {
   const contentParagraphs = tvParagraphs.value.filter(p => !p.isLabel)
   const allChecked = contentParagraphs.every(p => p.checked)
   tvParagraphs.value.forEach(p => { if (!p.isLabel) p.checked = !allChecked })
+}
+
+async function rewriteBroadcast() {
+  if (broadcastRewriting.value || tvParagraphs.value.length === 0) return
+  broadcastRewriting.value = true
+  try {
+    // Send non-label paragraphs only; labels are kept as-is
+    const payload = tvParagraphs.value
+      .filter(p => !p.isLabel)
+      .map(p => ({
+        text: p.text,
+        label: p.label || null,
+        asrStartTime: p.asrStartTime ?? null,
+        asrEndTime: p.asrEndTime ?? null,
+        asrConfidence: p.asrConfidence ?? null,
+        checked: p.checked,
+      }))
+    const res = await fetch('/voicebox-web/articles/broadcast-rewrite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paragraphs: payload }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '改写失败' }))
+      throw new Error(err.detail || '改写失败')
+    }
+    const data = await res.json()
+    const rewritten = data.paragraphs as TvParagraph[]
+
+    // Store in broadcastParagraphs — don't modify tvParagraphs
+    broadcastParagraphs.value = rewritten
+    broadcastTab.value = 'broadcast'
+    showToast('广播稿改写完成', 'success')
+  } catch (err: any) {
+    showToast(err.message || '广播稿改写失败', 'error')
+  } finally {
+    broadcastRewriting.value = false
+  }
+}
+
+function moveBroadcastParagraph(idx: number, direction: number) {
+  const arr = broadcastParagraphs.value
+  const target = idx + direction
+  if (target < 0 || target >= arr.length) return
+  const tmp = arr[idx]
+  arr[idx] = arr[target]
+  arr[target] = tmp
+}
+
+async function generateBroadcastAudio() {
+  if (broadcastGenerating.value) return
+  const paragraphs = broadcastParagraphs.value.filter(p => p.asrStartTime != null || p.text.trim())
+  if (paragraphs.length === 0) { showToast('广播稿为空', 'error'); return }
+  if (!selectedProfile.value) { showToast('请先选择音色', 'error'); return }
+
+  broadcastGenerating.value = true
+  try {
+    const payload = {
+      profile_id: selectedProfile.value,
+      language: 'zh',
+      paragraphs: paragraphs.map(p => ({
+        text: p.text,
+        asrStartTime: p.asrStartTime ?? null,
+        asrEndTime: p.asrEndTime ?? null,
+      })),
+    }
+    const mp4 = getSelectedVideoMp4()
+    if (mp4 && payload.paragraphs.some(p => p.asrStartTime != null)) {
+      ;(payload as any).video_url = mp4
+    }
+
+    const res = await fetch('/voicebox-web/articles/broadcast-audio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: '生成失败' }))
+      throw new Error(err.detail || '生成失败')
+    }
+    const blob = await res.blob()
+    currentAudioBlob.value = blob
+    currentAudio.value = null
+    showToast('广播稿音频生成完成', 'success')
+  } catch (err: any) {
+    showToast(err.message || '生成失败', 'error')
+  } finally {
+    broadcastGenerating.value = false
+  }
+}
+function toggleBroadcastSoundbite(p: TvParagraph) {
+  if (p.asrStartTime == null || p.asrEndTime == null) return
+  if (soundbiteAudio.value) {
+    soundbiteAudio.value.pause()
+    soundbiteAudio.value = null
+    playingSoundbiteIndex.value = null
+  }
+  const mp4 = getSelectedVideoMp4()
+  if (!mp4) return
+  const audio = new Audio(mp4)
+  audio.currentTime = p.asrStartTime
+  soundbiteAudio.value = audio
+  playingSoundbiteIndex.value = -1
+  audio.play().catch(() => {})
+  const duration = p.asrEndTime - p.asrStartTime
+  setTimeout(() => {
+    if (soundbiteAudio.value === audio) {
+      audio.pause()
+      soundbiteAudio.value = null
+      playingSoundbiteIndex.value = null
+    }
+  }, duration * 1000 + 500)
 }
 
 function autoResize(event: Event) {
@@ -1901,7 +2138,10 @@ async function fetchQueueList() {
     queueList.value = (res.tasks || []).filter(
       (task: any) => task.status === 'pending' || task.status === 'processing'
     )
-  } catch (e) {
+    queueError.value = null
+  } catch (e: any) {
+    const msg = e?.message || '获取队列列表失败'
+    queueError.value = msg
     console.error('获取队列列表失败:', e)
   }
 }
@@ -2053,7 +2293,10 @@ async function waitForCompletion(id: string, signal: AbortSignal): Promise<any> 
 }
 
 async function handleGenerate() {
-  const targetText = newsType.value === 'tv' ? getCheckedTvText.value : text.value
+  const isBroadcast = broadcastParagraphs.value.length > 0 && broadcastTab.value === 'broadcast'
+  const targetText = isBroadcast
+    ? getBroadcastText.value
+    : newsType.value === 'tv' ? getCheckedTvText.value : text.value
   if (currentModelSupportsClone.value && !selectedProfile.value) {
     showToast('请选择音色', 'error')
     return
@@ -2109,8 +2352,49 @@ function handleStop() {
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
-  const s = Math.round(seconds) % 60
-  return `${m}:${s.toString().padStart(2, '0')}`
+  const frac = seconds % 1
+  const s = Math.floor(seconds) % 60
+  const sStr = frac > 0.05
+    ? (s + frac).toFixed(1)
+    : s.toString().padStart(2, '0')
+  return `${m}:${frac > 0.05 ? sStr : s.toString().padStart(2, '0')}`
+}
+
+function parseTimeToSeconds(input: string): number | null {
+  const trimmed = input.trim()
+  if (!trimmed) return null
+  // "m:ss.s" or "ss.s" or "m:ss" or "ss"
+  const colonParts = trimmed.split(':')
+  if (colonParts.length === 2) {
+    const minutes = parseFloat(colonParts[0])
+    const seconds = parseFloat(colonParts[1])
+    if (isNaN(minutes) || isNaN(seconds)) return null
+    return minutes * 60 + seconds
+  }
+  const seconds = parseFloat(trimmed)
+  if (isNaN(seconds)) return null
+  return seconds
+}
+
+function nudgeAsr(p: TvParagraph, which: 'start' | 'end', delta: number) {
+  const key = which === 'start' ? 'asrStartTime' : 'asrEndTime'
+  const current = p[key]
+  if (current == null) return
+  const next = Math.max(0, +(current + delta).toFixed(1))
+  // ensure start <= end
+  if (which === 'start' && p.asrEndTime != null && next > p.asrEndTime) return
+  if (which === 'end' && p.asrStartTime != null && next < p.asrStartTime) return
+  p[key] = next
+}
+
+function applyAsrTime(p: TvParagraph, which: 'start' | 'end', raw: string) {
+  const parsed = parseTimeToSeconds(raw)
+  if (parsed == null || parsed < 0) return
+  const key = which === 'start' ? 'asrStartTime' : 'asrEndTime'
+  // ensure start <= end
+  if (which === 'start' && p.asrEndTime != null && parsed > p.asrEndTime) return
+  if (which === 'end' && p.asrStartTime != null && parsed < p.asrStartTime) return
+  p[key] = +parsed.toFixed(1)
 }
 
 watch(newsType, () => {
@@ -2121,6 +2405,8 @@ watch(newsType, () => {
   text.value = ''
   title.value = ''
   tvParagraphs.value = []
+  broadcastParagraphs.value = []
+  broadcastTab.value = 'tv'
   selectedArticle.value = null
   currentAudio.value = null
   currentAudioBlob.value = null
@@ -2193,4 +2479,33 @@ async function processImages() {
     ocrProcessing.value = false
   }
 }
+// 电视稿同期声起止点变化 → 同步到广播稿
+watch(tvParagraphs, () => {
+  if (broadcastParagraphs.value.length === 0) return
+  const tvSoundbites = tvParagraphs.value.filter(p => !p.isLabel && p.asrStartTime != null)
+  if (tvSoundbites.length === 0) return
+  let changed = false
+  let si = 0
+  for (const bp of broadcastParagraphs.value) {
+    if (bp.asrStartTime == null) continue
+    if (si < tvSoundbites.length) {
+      const match = tvSoundbites[si]
+      if (bp.asrStartTime !== match.asrStartTime || bp.asrEndTime !== match.asrEndTime) {
+        bp.asrStartTime = match.asrStartTime
+        bp.asrEndTime = match.asrEndTime
+        changed = true
+      }
+    }
+    si++
+  }
+  if (changed) broadcastParagraphs.value = [...broadcastParagraphs.value]
+}, { deep: true })
+
+watch(broadcastTab, (val) => {
+  // Resize textareas after tab switch (need DOM visible)
+  nextTick(() => {
+    setTimeout(() => resizeAllTextareas(), 50)
+  })
+})
+
 </script>

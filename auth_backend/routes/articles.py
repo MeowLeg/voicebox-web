@@ -8,12 +8,13 @@ import re
 import requests
 
 import fitz  # pymupdf
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, File
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from utils.ftp_upload import upload_to_ftp
-from utils.llm_rewrite import extract_and_rewrite_from_images
+from utils.llm_rewrite import extract_and_rewrite_from_images, rewrite_broadcast
+from utils.broadcast_audio import generate_broadcast_audio
 from routes.auth import has_permission
 from database import AudioRecord, User, get_db
 
@@ -111,3 +112,55 @@ async def search_video(req: VideoSearchRequest):
         return resp.json()
     except requests.RequestException as e:
         raise HTTPException(status_code=502, detail=f"视频搜索服务不可用: {e}")
+
+
+
+
+class BroadcastAudioRequest(BaseModel):
+    profile_id: str
+    paragraphs: list[dict]
+    video_url: str | None = None
+    language: str = "zh"
+
+
+@router.post("/broadcast-audio")
+async def broadcast_audio(req: BroadcastAudioRequest):
+    """Generate broadcast audio: body paragraphs via TTS, soundbites from video, merged."""
+    if not req.paragraphs:
+        raise HTTPException(status_code=400, detail="段落列表为空")
+    if not req.profile_id:
+        raise HTTPException(status_code=400, detail="请选择音色")
+
+    try:
+        audio_bytes = await asyncio.to_thread(
+            generate_broadcast_audio,
+            req.profile_id,
+            req.paragraphs,
+            req.video_url,
+            req.language,
+        )
+        return Response(content=audio_bytes, media_type="audio/wav",
+                        headers={"Content-Disposition": "attachment; filename=broadcast.wav"})
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class BroadcastRewriteRequest(BaseModel):
+    paragraphs: list[dict]
+
+
+@router.post("/broadcast-rewrite")
+async def broadcast_rewrite(req: BroadcastRewriteRequest):
+    """Rewrite tv news paragraphs for radio broadcast.
+    Non-soundbite text is rewritten; soundbite paragraphs are preserved.
+    """
+    if not req.paragraphs:
+        raise HTTPException(status_code=400, detail="段落列表为空")
+
+    try:
+        new_paragraphs = await asyncio.to_thread(rewrite_broadcast, req.paragraphs)
+        return {"paragraphs": new_paragraphs}
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))

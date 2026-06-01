@@ -97,7 +97,8 @@ export async function listQueueTasks(status?: string, limit = 50): Promise<Queue
   const query = new URLSearchParams()
   if (status) query.set('status', status)
   query.set('limit', String(limit))
-  const res = await queueFetch(`${QUEUE_BASE}/tasks?${query.toString()}`)
+  const url = `${QUEUE_BASE}/tasks?${query.toString()}`
+  const res = await queueFetch(url)
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.detail || '获取任务列表失败')
