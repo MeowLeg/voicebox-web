@@ -524,10 +524,13 @@
         </div>
 
         <!-- 右侧队列面板 -->
-         <div class="w-80 shrink-0 border-l border-zinc-200 dark:border-zinc-800 p-4 flex flex-col">
-          <h3 class="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3">生成队列 ({{ queueList.length }})</h3>
-          <div class="flex-1 overflow-y-auto space-y-3">
-            <div v-if="queueList.length === 0" class="text-xs text-zinc-400 text-center py-4">暂无任务</div>
+         <div :class="['shrink-0 border-l border-zinc-200 dark:border-zinc-800 flex flex-col transition-all', queueCollapsed ? 'w-10 p-2' : 'w-80 p-4']">
+          <button @click="queueCollapsed = !queueCollapsed" class="flex items-center gap-2 text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-3 w-full text-left">
+            <span class="text-xs">{{ queueCollapsed ? '▶' : '▼' }}</span>
+            <span v-if="!queueCollapsed">生成队列 ({{ queueList.length }})</span>
+            <span v-else class="text-xs" :title="queueList.length + '个任务'">{{ queueList.length }}</span>
+          </button>
+          <div v-show="!queueCollapsed" class="flex-1 overflow-y-auto space-y-3">
             <div v-if="queueError" class="text-xs text-red-500 text-center py-2 px-2 bg-red-50 dark:bg-red-900/20 rounded-lg">
               {{ queueError }}
             </div>
@@ -566,7 +569,7 @@
               </div>
             </div>
           </div>
-          <div class="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-700">
+          <div v-show="!queueCollapsed" class="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-700">
             <button
               @click="handleGenerate"
               :disabled="(currentModelSupportsClone ? !selectedProfile : !selectedVoiceId) || (broadcastParagraphs.length > 0 && broadcastTab === 'broadcast' ? getBroadcastText.length === 0 : (newsType === 'tv' ? getCheckedTvText.length === 0 : !text.trim())) || backendOnline === false"
@@ -1073,6 +1076,7 @@ const loadingFromHistory = ref(false)
 const showCreateProfileModal = ref(false)
 const queueList = ref<any[]>([])
 const queueError = ref<string | null>(null)
+const queueCollapsed = ref(false)
 const creatingProfile = ref(false)
 const showEffectsModal = ref(false)
 const availableEffects = ref<AvailableEffect[]>([])
