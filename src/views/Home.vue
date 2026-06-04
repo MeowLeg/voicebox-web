@@ -665,159 +665,30 @@
         </div>
       </div>
     </main>
-    <div v-if="showModelsModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showModelsModal = false">
-      <div class="bg-white dark:bg-zinc-900 rounded-xl p-6 w-[500px] max-h-[80vh] overflow-y-auto">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold">模型管理</h3>
-          <button @click="showModelsModal = false" class="text-zinc-400 hover:text-zinc-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-        
-        <div v-if="modelsLoading" class="text-center py-4 text-zinc-400">加载中...</div>
-        <div v-else class="space-y-3">
-          <div
-            v-for="model in models"
-            :key="model.model_name"
-            class="flex items-center justify-between p-3 rounded-lg border border-zinc-200 dark:border-zinc-700"
-          >
-            <div class="flex-1 min-w-0">
-              <div class="font-medium truncate">{{ model.display_name }}</div>
-              <div class="text-xs text-zinc-400 mt-1">
-                <span v-if="model.loaded" class="text-green-600">已加载</span>
-                <span v-else-if="model.downloaded" class="text-yellow-600">已下载</span>
-                <span v-else class="text-zinc-400">
-                  {{ model.size_mb ? (model.size_mb / 1024).toFixed(1) + ' GB' : '' }}
-                </span>
-                <span v-if="model.supports_clone" class="ml-2 text-blue-500">支持音色克隆</span>
-                <span v-else class="ml-2 text-zinc-500">固定音色</span>
-              </div>
-            </div>
-            <button
-              v-if="!model.downloaded"
-              @click="handleDownloadModel(model.model_name)"
-              :disabled="model.downloading"
-              class="px-3 py-1 text-sm rounded-lg border border-zinc-300 dark:border-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50"
-            >
-              {{ model.downloading ? '下载中...' : '下载' }}
-            </button>
-            <span v-else-if="!model.loaded" class="text-sm text-yellow-600">点击模型列表加载</span>
-            <span v-else class="text-sm text-green-600"></span>
-          </div>
-        </div>
-      </div>
-    </div>
+    <ModelsModal
+      :show="showModelsModal"
+      :loading="modelsLoading"
+      :models="models"
+      @close="showModelsModal = false"
+      @download="handleDownloadModel"
+    />
 
     <!-- 新建音色弹窗 -->
-    <div v-if="showCreateProfileModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="closeCreateProfileModal">
-      <div class="bg-white dark:bg-zinc-900 rounded-xl p-6 w-[500px] max-h-[90vh] overflow-y-auto">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold">新建音色</h3>
-          <button @click="closeCreateProfileModal" class="text-zinc-400 hover:text-zinc-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">音色名称 *</label>
-            <input
-              v-model="newProfile.name"
-              type="text"
-              class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="请输入音色名称"
-            />
-          </div>
-          <div>
-            <label class="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">描述</label>
-            <textarea
-              v-model="newProfile.description"
-              rows="2"
-              class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              placeholder="可选描述"
-            />
-          </div>
-          <div>
-            <label class="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">语言</label>
-            <select
-              v-model="newProfile.language"
-              class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="zh">中文</option>
-              <option value="en">英文</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">音频 *</label>
-            <div class="flex gap-2 mb-2">
-              <button
-                @click="toggleRecording"
-                :class="[
-                  'flex-1 px-3 py-2 text-sm rounded-lg border',
-                  isRecording 
-                    ? 'bg-red-100 border-red-300 text-red-600 dark:bg-red-900/30 dark:border-red-700 dark:text-red-400' 
-                    : 'border-zinc-300 dark:border-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-800'
-                ]"
-              >
-                {{ isRecording ? '停止录音' : '开始录音' }}
-              </button>
-              <button
-                @click="triggerFileInput"
-                class="flex-1 px-3 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-              >
-                上传文件
-              </button>
-            </div>
-            <input
-              ref="fileInput"
-              type="file"
-              accept="audio/*,.wav,.mp3,.m4a,.flac"
-              class="hidden"
-              @change="handleFileSelect"
-            />
-            <div
-              v-if="newProfile.audioFile"
-              class="text-sm text-green-600 dark:text-green-400 flex items-center gap-2"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-              </svg>
-              {{ newProfile.audioFile.name || '录音文件' }}
-            </div>
-            <div v-else class="text-xs text-zinc-400">
-              建议10-30秒的清晰语音
-            </div>
-          </div>
-          <div>
-            <label class="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">音频对应的文字 *</label>
-            <textarea
-              v-model="newProfile.referenceText"
-              rows="3"
-              class="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              placeholder="请输入音频中朗读的文字内容"
-            />
-          </div>
-          <div class="flex justify-end gap-2">
-            <button
-              @click="closeCreateProfileModal"
-              class="px-4 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            >
-              取消
-            </button>
-            <button
-              @click="handleCreateProfile"
-              :disabled="creatingProfile || !canCreateProfile"
-              class="px-4 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-300 text-white"
-            >
-              {{ creatingProfile ? '创建中...' : '创建' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+
+    <CreateProfileModal
+      :show="showCreateProfileModal"
+      :creating="creatingProfile"
+      :can-create="canCreateProfile"
+      :profile="newProfile"
+      :is-recording="isRecording"
+      :audio-file-name="newProfile.audioFile?.name || ''"
+      @close="closeCreateProfileModal"
+      @update:profile="newProfile = $event"
+      @toggle-record="toggleRecording"
+      @trigger-upload="triggerFileInput"
+      @file-selected="handleFileSelect($event)"
+      @create="handleCreateProfile"
+    />
 
     <!-- 效果配置弹窗 -->
     <div
@@ -1024,6 +895,8 @@ import { fetchPaperArticles, fetchTvNewsLists, fetchTvNewsDetail, fetchTvArticle
 import { fetchAdminUsers, grantPermission, revokePermission, createUser, updateUser, deleteUser } from '@/api'
 import { NEWSPAPER_SITE_ID, NEWSPAPER_DOC_STATUS, TV_COLUMN_ID, SHOW_TV_NEWS } from '@/config'
 import { useAuth } from '@/composables/useAuth'
+import ModelsModal from '@/components/ModelsModal.vue'
+import CreateProfileModal from '@/components/CreateProfileModal.vue'
 import { listQueueTasks, submitQueueTask } from '@/api/queue'
 
 const auth = useAuth()
