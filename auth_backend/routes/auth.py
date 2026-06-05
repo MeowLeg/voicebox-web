@@ -116,7 +116,7 @@ def register(
     user = User(
         id=str(uuid.uuid4()),
         username=req.username,
-        email=req.email,
+        email=req.email if req.email and req.email.strip() else None,
         hashed_password=get_password_hash(req.password),
         created_at=datetime.utcnow(),
     )
@@ -249,7 +249,7 @@ def create_user(
     user = User(
         id=str(uuid.uuid4()),
         username=req.username,
-        email=req.email,
+        email=req.email if req.email and req.email.strip() else None,
         hashed_password=get_password_hash(req.password),
         role=req.role,
     )

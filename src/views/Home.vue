@@ -1564,7 +1564,7 @@ async function saveUser() {
       await updateUser(editingUser.value.id, data)
       showToast('用户已更新', 'success')
     } else {
-      await createUser(userForm.value)
+      await createUser({ ...userForm.value, email: userForm.value.email || null })
       showToast('用户已创建', 'success')
     }
     showUserForm.value = false
