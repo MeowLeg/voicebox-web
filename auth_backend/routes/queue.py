@@ -73,7 +73,11 @@ def list_tasks(
     query = db.query(QueueTask)
     query = query.filter(QueueTask.user_id == effective_user_id)
     if status:
-        query = query.filter(QueueTask.status == status)
+        status_list = [s.strip() for s in status.split(",") if s.strip()]
+        query = query.filter(QueueTask.status.in_(status_list))
+    else:
+        # Default: only show pending/processing, not completed/failed/cancelled
+        query = query.filter(QueueTask.status.in_(["pending", "processing"]))
     tasks = (
         query.order_by(QueueTask.created_at.asc())
         .limit(limit)

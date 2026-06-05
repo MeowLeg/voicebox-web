@@ -690,168 +690,27 @@
       @create="handleCreateProfile"
     />
 
-    <!-- 效果配置弹窗 -->
-    <div
-      v-if="showEffectsModal"
-      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-      @click.self="showEffectsModal = false"
-    >
-      <div class="bg-white dark:bg-zinc-900 rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
-        <div class="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-          <h3 class="text-lg font-semibold">效果配置</h3>
-          <button @click="showEffectsModal = false" class="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-        <div class="p-6 overflow-y-auto max-h-[calc(80vh-130px)]">
-          <div v-if="effectsLoading" class="text-center py-8 text-zinc-500">加载中...</div>
-          <div v-else class="space-y-6">
-            <div v-for="effect in availableEffects" :key="effect.type" class="border border-zinc-200 dark:border-zinc-700 rounded-lg p-4">
-              <div class="flex items-center gap-3 mb-3">
-                <input
-                  type="checkbox"
-                  :id="'effect-' + effect.type"
-                  :checked="isEffectEnabled(effect.type)"
-                  @change="toggleEffect(effect.type)"
-                  class="w-4 h-4 rounded"
-                />
-                <label :for="'effect-' + effect.type" class="font-medium cursor-pointer">
-                  {{ effectLabels[effect.type] || effect.label }}
-                </label>
-              </div>
-              <p class="text-sm text-zinc-500 mb-3">{{ effect.description }}</p>
-              <div v-if="isEffectEnabled(effect.type)" class="grid grid-cols-2 gap-4">
-                <div v-for="(param, paramKey) in effect.params" :key="paramKey" class="space-y-1">
-                  <label class="text-xs text-zinc-500">{{ effectLabelsZh[effect.type]?.[String(paramKey)] || param.description }}</label>
-            <div class="hidden">
-              <label class="text-zinc-500 dark:text-zinc-400">语言:</label>
-              <select
-                v-model="language"
-                class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="zh">中文</option>
-                <option value="en">英文</option>
-              </select>
-            </div>
-
-             <div class="hidden">
-               <label class="text-zinc-500 dark:text-zinc-400">语调:</label>
-               <select
-                 v-model="tone"
-                 class="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-               >
-                 <option value="">正常</option>
-                 <option value="播音腔">播音腔</option>
-                 <option value="新闻播报">新闻播报</option>
-                 <option value="讲故事">讲故事</option>
-                 <option value="激动">激动</option>
-                 <option value="舒缓">舒缓</option>
-               </select>
-             </div>
-
-             <div class="flex items-center gap-2">
-                    <template v-if="param.options">
-                      <select
-                        :value="getEffectParam(effect.type, String(paramKey))"
-                        @change="setEffectParam(effect.type, String(paramKey), ($event.target as HTMLSelectElement).value)"
-                        class="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option v-for="opt in param.options" :key="opt" :value="opt">{{ opt }}</option>
-                      </select>
-                    </template>
-                    <template v-else>
-                      <input
-                        type="range"
-                        :min="param.min"
-                        :max="param.max"
-                        :step="param.step"
-                        :value="getEffectParam(effect.type, String(paramKey))"
-                        @input="setEffectParam(effect.type, String(paramKey), Number(($event.target as HTMLInputElement).value))"
-                        class="flex-1"
-                      />
-                      <span class="text-sm w-16 text-right">{{ getEffectParam(effect.type, String(paramKey)) }}</span>
-                    </template>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 flex justify-end gap-2">
-          <button
-            @click="resetEffects"
-            class="px-4 py-2 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-          >
-            重置
-          </button>
-          <button
-            @click="saveEffects"
-            :disabled="effectsLoading"
-            class="px-4 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            保存
-          </button>
-        </div>
-      </div>
-    </div>
-    <!-- 用户权限管理弹窗 -->
-    <div
-      v-if="showAdminModal"
-      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-      @click.self="showAdminModal = false"
-    >
-       <div class="bg-white dark:bg-zinc-900 rounded-xl p-6 w-[580px] max-h-[85vh] overflow-y-auto">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold">用户权限管理</h3>
-          <div class="flex items-center gap-2">
-            <button @click="showUserForm = true; editingUser = null; userForm = { username: '', password: '', email: '', role: 'user' }" class="px-3 py-1 text-xs rounded-lg bg-blue-600 hover:bg-blue-700 text-white">新建用户</button>
-            <button @click="showAdminModal = false" class="text-zinc-400 hover:text-zinc-600">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <div v-if="showUserForm" class="mb-4 p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 space-y-2">
-          <div class="flex gap-2">
-            <input v-model="userForm.username" placeholder="用户名" class="flex-1 rounded border border-zinc-300 dark:border-zinc-600 px-2 py-1 text-sm" />
-            <input v-model="userForm.password" :placeholder="editingUser ? '留空不修改' : '密码'" class="flex-1 rounded border border-zinc-300 dark:border-zinc-600 px-2 py-1 text-sm" />
-          </div>
-          <div class="flex gap-2">
-            <input v-model="userForm.email" placeholder="邮箱（可选）" class="flex-1 rounded border border-zinc-300 dark:border-zinc-600 px-2 py-1 text-sm" />
-            <select v-model="userForm.role" class="w-24 rounded border border-zinc-300 dark:border-zinc-600 px-2 py-1 text-sm">
-              <option value="user">user</option>
-              <option value="admin">admin</option>
-            </select>
-          </div>
-          <div class="flex justify-end gap-2">
-            <button @click="showUserForm = false" class="px-3 py-1 text-xs rounded border border-zinc-300 dark:border-zinc-600">取消</button>
-            <button @click="saveUser" :disabled="userSaving" class="px-3 py-1 text-xs rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50">{{ userSaving ? '保存中...' : editingUser ? '更新' : '创建' }}</button>
-          </div>
-        </div>
-
-        <div v-if="adminLoading" class="text-center py-4 text-zinc-400">加载中...</div>
-        <div v-else class="space-y-2">
-          <div v-for="u in adminUsers" :key="u.id" class="flex items-center justify-between p-3 rounded-lg border border-zinc-200 dark:border-zinc-700">
-            <div>
-              <div class="font-medium text-sm">{{ u.username }} <span v-if="u.role === 'admin'" class="text-xs text-blue-500 ml-1">(admin)</span></div>
-              <div class="text-xs text-zinc-400">{{ u.email || '' }}</div>
-            </div>
-            <div class="flex items-center gap-2">
-              <label class="flex items-center gap-1 text-xs cursor-pointer" v-for="perm in ['broadcast']" :key="perm">
-                <input type="checkbox" :checked="u.permissions.includes(perm)" @change="togglePermission(u, perm)" class="w-3.5 h-3.5" />
-                {{ perm === 'broadcast' ? '广播推送' : perm }}
-              </label>
-              <button @click="editUser(u)" class="text-xs text-blue-500 hover:text-blue-600 ml-1">编辑</button>
-              <button @click="deleteUser(u)" :disabled="u._deleting" class="text-xs text-red-500 hover:text-red-600 ml-1">{{ u._deleting ? '...' : '删除' }}</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <EffectsModal
+      :show="showEffectsModal"
+      :loading="effectsLoading"
+      :effects="availableEffects"
+      :labels="effectLabels"
+      :labels-zh="effectLabelsZh"
+      v-model="profileEffects"
+      @close="showEffectsModal = false"
+      @save="saveEffects"
+      @reset="resetEffects"
+    />
+    <AdminModal
+      :show="showAdminModal"
+      :loading="adminLoading"
+      :users="adminUsers"
+      :saving="userSaving"
+      @close="showAdminModal = false"
+      @save-user="handleSaveUser"
+      @toggle-permission="togglePermission"
+      @delete-user="deleteUser"
+    />
 
     <!-- 图片预览弹窗 -->
     <div
@@ -897,6 +756,8 @@ import { NEWSPAPER_SITE_ID, NEWSPAPER_DOC_STATUS, TV_COLUMN_ID, SHOW_TV_NEWS } f
 import { useAuth } from '@/composables/useAuth'
 import ModelsModal from '@/components/ModelsModal.vue'
 import CreateProfileModal from '@/components/CreateProfileModal.vue'
+import EffectsModal from '@/components/EffectsModal.vue'
+import AdminModal from '@/components/AdminModal.vue'
 import { listQueueTasks, submitQueueTask } from '@/api/queue'
 
 const auth = useAuth()
@@ -978,10 +839,7 @@ const playingSoundbiteIndex = ref<number | null>(null)
 const showAdminModal = ref(false)
 const adminUsers = ref<any[]>([])
 const adminLoading = ref(false)
-const showUserForm = ref(false)
-const editingUser = ref<any>(null)
 const userSaving = ref(false)
-const userForm = ref({ username: '', password: '', email: '', role: 'user' })
 
 const effectLabels: Record<string, string> = {
   chorus: '合唱/镶边',
@@ -1573,11 +1431,6 @@ async function saveUser() {
   }
 }
 
-function editUser(u: any) {
-  editingUser.value = u
-  userForm.value = { username: u.username, password: '', email: u.email || '', role: u.role }
-  showUserForm.value = true
-}
 
 async function deleteUser(u: any) {
   if (!confirm(`确定删除用户 "${u.username}"？`)) return
@@ -1636,10 +1489,6 @@ async function openEffectsModal() {
   }
 }
 
-function isEffectEnabled(type: string): boolean {
-  return profileEffects.value.some(e => e.type === type)
-}
-
 function getEffectParam(type: string, paramKey: string): number {
   const effect = profileEffects.value.find(e => e.type === type)
   return (effect?.params?.[paramKey] as number) ?? 
@@ -1660,16 +1509,6 @@ function toggleEffect(type: string) {
       profileEffects.value.push({ type, params })
     }
   }
-}
-
-function setEffectParam(type: string, paramKey: string, value: number | string) {
-  let effect = profileEffects.value.find(e => e.type === type)
-  if (!effect) {
-    effect = { type, params: {} }
-    profileEffects.value.push(effect)
-  }
-  if (!effect.params) effect.params = {}
-  effect.params[paramKey] = value
 }
 
 async function saveEffects() {

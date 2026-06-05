@@ -121,10 +121,14 @@ class QueueWorker:
 
             task_type = req_data.get("task_type", "tts")
             if task_type == "asr_align":
-                self._process_asr_align(task, req_data, db)
+                db.commit()
+                db.close()
+                self._process_asr_align(task_id, req_data)
                 return
             if task_type == "broadcast":
-                self._process_broadcast(task, req_data, db)
+                db.commit()
+                db.close()
+                self._process_broadcast(task_id, req_data)
                 return
 
             tts_payload = {k: v for k, v in req_data.items() if k != "speed"}
@@ -243,104 +247,19 @@ class QueueWorker:
             except Exception:
                 pass
 
-    def _process_broadcast(self, task, req_data, db):
-        from utils.broadcast_audio import generate_broadcast_audio
 
-        task_id = task.id
-        paragraphs = req_data.get("paragraphs", [])
-        video_url = req_data.get("video_url")
-        profile_id = req_data.get("profile_id")
-        language = req_data.get("language", "zh")
-
-        if not paragraphs or not profile_id:
-            task.status = "failed"
-            task.error = "广播稿缺少段落或音色"
-            db.commit()
-            logger.error(f"Task {task_id}: Broadcast missing paragraphs/profile")
-            return
-
-        # Commit initial state and release DB connection before long audio processing
-        task.progress = 10.0
-        db.commit()
-        db.close()
-
-        try:
-            wav_bytes = generate_broadcast_audio(
-                profile_id=profile_id,
-                paragraphs=paragraphs,
-                video_url=video_url,
-                language=language,
-            )
-
-            # Re-open DB to update status
-            db2 = SessionLocal()
-            try:
-                task2 = db2.query(QueueTask).filter(QueueTask.id == task_id).first()
-                if not task2:
-                    return
-
-                # Save to voicebox data dir
-                gen_id = str(uuid.uuid4())
-                gen_dir = Path(VOICEBOX_DATA_DIR) / "generations"
-                gen_dir.mkdir(parents=True, exist_ok=True)
-                wav_path = gen_dir / f"{gen_id}.wav"
-                wav_path.write_bytes(wav_bytes)
-
-                # Convert to MP3
-                from utils.speed_effects import convert_to_mp3
-                convert_to_mp3(wav_path, wav_path.with_suffix(".mp3"))
-
-                audio_url = f"/voicebox-web/audio/{gen_id}"
-                task2.voicebox_generation_id = gen_id
-                task2.status = "completed"
-                task2.progress = 100.0
-                task2.audio_url = audio_url
-                task2.updated_at = datetime.now(timezone.utc)
-                db2.commit()
-                logger.info(f"Task {task_id}: Broadcast completed!")
-
-                # Create audio record
-                try:
-                    record = AudioRecord(
-                        id=str(uuid.uuid4()),
-                        user_id=task2.user_id,
-                        voicebox_generation_id=gen_id,
-                        profile_id=profile_id,
-                        text=task2.request_data.get("title", "") or "广播稿",
-                        title=task2.request_data.get("title", ""),
-                        language=language,
-                        audio_url=audio_url,
-                        status="completed",
-                        engine=req_data.get("engine", ""),
-                        model_size=req_data.get("model_size", ""),
-                    )
-                    db2.add(record)
-                    db2.commit()
-                except Exception as e:
-                    logger.error(f"Task {task_id}: Failed to create audio record: {e}")
-            finally:
-                db2.close()
-
-        except Exception as e:
-            db2 = SessionLocal()
-            try:
-                task2 = db2.query(QueueTask).filter(QueueTask.id == task_id).first()
-                if task2:
-                    task2.status = "failed"
-                    task2.error = str(e)[:500]
-                    task2.updated_at = datetime.now(timezone.utc)
-                    db2.commit()
-            finally:
-                db2.close()
-            logger.error(f"Task {task_id}: Broadcast failed: {e}")
-
-    def _process_asr_align(self, task, req_data, db):
+    def _process_asr_align(self, task_id, req_data):
         """后台处理 ASR 同期声对齐任务。"""
         video_url = req_data["video_url"]
         manuscript = req_data["manuscript"]
         model_size = req_data.get("model_size", "small")
 
+        db = SessionLocal()
         try:
+            task = db.query(QueueTask).filter(QueueTask.id == task_id).first()
+            if not task:
+                return
+
             task.progress = 10.0
             task.updated_at = datetime.now(timezone.utc)
             db.commit()
@@ -380,14 +299,20 @@ class QueueWorker:
         except Exception as e:
             logger.error(f"ASR align task failed: {e}")
             try:
-                task.status = "failed"
-                task.error = str(e)
-                task.updated_at = datetime.now(timezone.utc)
-                db.commit()
+                db2 = SessionLocal()
+                task2 = db2.query(QueueTask).filter(QueueTask.id == task_id).first()
+                if task2:
+                    task2.status = "failed"
+                    task2.error = str(e)
+                    task2.updated_at = datetime.now(timezone.utc)
+                    db2.commit()
+                db2.close()
             except Exception:
                 pass
+        finally:
+            db.close()
 
-    def _process_broadcast(self, task, req_data, db):
+    def _process_broadcast(self, task_id, req_data):
         from utils.broadcast_audio import generate_broadcast_audio
 
         task_id = task.id
@@ -459,4 +384,98 @@ class QueueWorker:
             task.error = str(e)[:500]
             task.updated_at = datetime.now(timezone.utc)
             db.commit()
+            logger.error(f"Task {task_id}: Broadcast failed: {e}")
+    def _process_broadcast(self, task_id, req_data):
+        from utils.broadcast_audio import generate_broadcast_audio
+
+        paragraphs = req_data.get("paragraphs", [])
+        video_url = req_data.get("video_url")
+        profile_id = req_data.get("profile_id")
+        language = req_data.get("language", "zh")
+
+        db = SessionLocal()
+        try:
+            task = db.query(QueueTask).filter(QueueTask.id == task_id).first()
+            if not task:
+                return
+
+            if not paragraphs or not profile_id:
+                task.status = "failed"
+                task.error = "广播稿缺少段落或音色"
+                db.commit()
+                logger.error(f"Task {task_id}: Broadcast missing paragraphs/profile")
+                return
+
+            task.progress = 10.0
+            db.commit()
+        finally:
+            db.close()
+
+        try:
+            wav_bytes = generate_broadcast_audio(
+                profile_id=profile_id,
+                paragraphs=paragraphs,
+                video_url=video_url,
+                language=language,
+            )
+
+            # Save to voicebox data dir
+            gen_id = str(uuid.uuid4())
+            gen_dir = Path(VOICEBOX_DATA_DIR) / "generations"
+            gen_dir.mkdir(parents=True, exist_ok=True)
+            wav_path = gen_dir / f"{gen_id}.wav"
+            wav_path.write_bytes(wav_bytes)
+
+            # Convert to MP3
+            from utils.speed_effects import convert_to_mp3
+            convert_to_mp3(wav_path, wav_path.with_suffix(".mp3"))
+
+            audio_url = f"/voicebox-web/audio/{gen_id}"
+
+            db2 = SessionLocal()
+            try:
+                task2 = db2.query(QueueTask).filter(QueueTask.id == task_id).first()
+                if not task2:
+                    return
+
+                task2.voicebox_generation_id = gen_id
+                task2.status = "completed"
+                task2.progress = 100.0
+                task2.audio_url = audio_url
+                task2.updated_at = datetime.now(timezone.utc)
+                db2.commit()
+                logger.info(f"Task {task_id}: Broadcast completed!")
+
+                try:
+                    record = AudioRecord(
+                        id=str(uuid.uuid4()),
+                        user_id=task2.user_id,
+                        voicebox_generation_id=gen_id,
+                        profile_id=profile_id,
+                        text=task2.request_data.get("title", "") or "广播稿",
+                        title=task2.request_data.get("title", ""),
+                        language=language,
+                        audio_url=audio_url,
+                        status="completed",
+                        engine=req_data.get("engine", ""),
+                        model_size=req_data.get("model_size", ""),
+                    )
+                    db2.add(record)
+                    db2.commit()
+                except Exception as e:
+                    logger.exception(f"Task {task_id}: Failed to create audio record")
+            finally:
+                db2.close()
+
+        except Exception as e:
+            db3 = SessionLocal()
+            try:
+                task3 = db3.query(QueueTask).filter(QueueTask.id == task_id).first()
+                if task3:
+                    task3.status = "failed"
+                    task3.error = str(e)[:500]
+                    task3.updated_at = datetime.now(timezone.utc)
+                    db3.commit()
+            finally:
+                db3.close()
             logger.error(f"Task {task_id}: Broadcast failed: {e}")
