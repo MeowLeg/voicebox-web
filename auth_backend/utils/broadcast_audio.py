@@ -116,7 +116,7 @@ def _concat_wavs(wav_list: list[bytes], tmp_dir: Path) -> bytes:
         for i in range(len(wav_list)):
             filter_parts.append(f"[{i}:a]aresample=44100:async=1[{i}n]")
         concat_inputs = "".join(f"[{i}n]" for i in range(len(wav_list)))
-        filter_str = ";".join(filter_parts) + f";{concat_inputs}concat=n={len(wav_list)}:v=0:a=1[out]"
+        filter_str = ";".join(filter_parts) + f";{concat_inputs}concat=n={len(wav_list)}:v=0:a=1,loudnorm=I=-16:TP=-1.5:LRA=11[out]"
 
         output_path = tmp_dir / "broadcast.wav"
         cmd = [
