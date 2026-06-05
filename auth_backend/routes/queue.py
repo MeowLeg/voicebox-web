@@ -16,7 +16,7 @@ router = APIRouter(prefix="/queue", tags=["queue"])
 class QueueSubmitRequest(BaseModel):
     profile_id: Optional[str] = None
     voice_id: Optional[str] = None
-    text: str
+    text: Optional[str] = None
     title: Optional[str] = None
     language: Optional[str] = None
     seed: Optional[int] = None
@@ -25,6 +25,9 @@ class QueueSubmitRequest(BaseModel):
     model_size: Optional[str] = None
     max_chunk_chars: Optional[int] = None
     speed: Optional[float] = None
+    task_type: Optional[str] = None
+    paragraphs: Optional[list] = None
+    video_url: Optional[str] = None
 
 
 @router.post("/submit")

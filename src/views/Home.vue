@@ -1364,9 +1364,11 @@ async function generateBroadcastAudio() {
 
   broadcastGenerating.value = true
   try {
-    const payload = {
+    const req: any = {
+      task_type: 'broadcast',
       profile_id: selectedProfile.value,
       language: 'zh',
+      title: title.value.trim() || undefined,
       paragraphs: paragraphs.map(p => ({
         text: p.text,
         asrStartTime: p.asrStartTime ?? null,
@@ -1374,25 +1376,20 @@ async function generateBroadcastAudio() {
       })),
     }
     const mp4 = getSelectedVideoMp4()
-    if (mp4 && payload.paragraphs.some(p => p.asrStartTime != null)) {
-      ;(payload as any).video_url = mp4
+    if (mp4 && req.paragraphs.some((p: any) => p.asrStartTime != null)) {
+      req.video_url = mp4
     }
+    const engine = getEngine(selectedModel.value)
+    if (engine) req.engine = engine
+    const ms = getModelSize(selectedModel.value)
+    if (ms) req.model_size = ms
 
-    const res = await fetch('/voicebox-web/articles/broadcast-audio', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: '生成失败' }))
-      throw new Error(err.detail || '生成失败')
-    }
-    const blob = await res.blob()
-    currentAudioBlob.value = blob
-    currentAudio.value = null
-    showToast('广播稿音频生成完成', 'success')
+    await submitQueueTask(req)
+    showToast('广播稿任务已添加到队列', 'success')
+    await fetchQueueList()
+    queueCollapsed.value = false
   } catch (err: any) {
-    showToast(err.message || '生成失败', 'error')
+    showToast(err.message || '提交失败', 'error')
   } finally {
     broadcastGenerating.value = false
   }
