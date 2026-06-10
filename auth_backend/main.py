@@ -36,6 +36,20 @@ queue_worker = QueueWorker()
 def startup():
     init_db()
     queue_worker.start()
+    # Trigger video sync in background, then every hour
+    import threading
+    import time as _time
+    from utils.video_fetcher import sync_videos
+
+    def _video_sync_loop():
+        while True:
+            try:
+                sync_videos()
+            except Exception:
+                pass
+            _time.sleep(3600)
+
+    threading.Thread(target=_video_sync_loop, daemon=True).start()
 
 
 @app.on_event("shutdown")

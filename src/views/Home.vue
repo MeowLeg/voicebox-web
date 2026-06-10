@@ -1010,8 +1010,9 @@ async function fetchSoundbiteAlignment() {
 }
 
 function playVideo(v: any) {
-  const mp4 = (v.file_paths || []).find((p: string) => p.endsWith('.mp4'))
+  let mp4 = (v.file_paths || []).find((p: string) => p.endsWith('.mp4'))
   if (mp4) {
+    if (v.source === 'local') mp4 = `/voicebox-web${mp4}`
     resetVideoMarks()
     videoPlayerUrl.value = mp4
   }
@@ -1072,6 +1073,11 @@ function getSelectedVideoMp4(): string | null {
   if (idx === null) return null
   const v = videoResults.value[idx]
   if (!v) return null
+  if (v.source === 'local') {
+    const mp4 = (v.file_paths || [])[0]
+    if (!mp4) return null
+    return `/voicebox-web${mp4}`
+  }
   return (v.file_paths || []).find((p: string) => p.endsWith('.mp4')) || null
 }
 function toggleSoundbite(p: TvParagraph) {

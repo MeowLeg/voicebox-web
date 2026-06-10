@@ -22,6 +22,13 @@ module.exports = {
           proxyReq.path = req.url.replace(/^\/voicebox-web/, '');
         }
       },
+      '/voicebox-web/articles/local-video': {
+        target: authTarget,
+        changeOrigin: true,
+        onProxyReq: (proxyReq, req) => {
+          proxyReq.path = req.url.replace(/^\/voicebox-web/, '');
+        }
+      },
       '/voicebox-web/articles/search-video': {
         target: authTarget,
         changeOrigin: true,

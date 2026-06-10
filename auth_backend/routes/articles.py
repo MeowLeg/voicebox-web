@@ -9,12 +9,14 @@ import requests
 
 import fitz  # pymupdf
 from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, File
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from utils.ftp_upload import upload_to_ftp
 from utils.llm_rewrite import extract_and_rewrite_from_images, rewrite_broadcast
 from utils.broadcast_audio import generate_broadcast_audio
+from utils.video_fetcher import search_local, sync_videos, VIDEO_DIR
 from routes.auth import has_permission
 from database import AudioRecord, User, get_db
 
@@ -101,6 +103,12 @@ VIDEO_SEARCH_URL = "http://61.153.213.238:4029/searchMahNews"
 
 @router.post("/search-video")
 async def search_video(req: VideoSearchRequest):
+    # First try local library
+    local_results = await asyncio.to_thread(search_local, req.title)
+    if local_results:
+        return local_results
+
+    # Fall back to remote API
     try:
         resp = requests.post(
             VIDEO_SEARCH_URL,
@@ -112,6 +120,25 @@ async def search_video(req: VideoSearchRequest):
         return resp.json()
     except requests.RequestException as e:
         raise HTTPException(status_code=502, detail=f"视频搜索服务不可用: {e}")
+
+
+@router.post("/sync-videos")
+async def trigger_sync_videos():
+    """Manually trigger FTP video sync."""
+    try:
+        await asyncio.to_thread(sync_videos)
+        return {"status": "ok", "message": "视频同步完成"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/local-video/{filename}")
+async def serve_local_video(filename: str):
+    """Serve local video files."""
+    file_path = VIDEO_DIR / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="视频文件不存在")
+    return FileResponse(str(file_path), media_type="video/mp4")
 
 
 

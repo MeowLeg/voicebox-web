@@ -76,6 +76,19 @@ class UserPermission(Base):
     user = relationship("User", back_populates="permissions")
 
 
+
+class LocalVideo(Base):
+    __tablename__ = "local_videos"
+
+    id = Column(String, primary_key=True, index=True)
+    title = Column(String, index=True)
+    file_name = Column(String, nullable=False)
+    file_path = Column(String, nullable=False)
+    file_size = Column(Integer, default=0)
+    video_date = Column(String, index=True)  # YYYY-MM-DD
+    downloaded_at = Column(DateTime, default=datetime.utcnow)
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)
 
