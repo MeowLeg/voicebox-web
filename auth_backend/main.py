@@ -42,9 +42,11 @@ def startup():
     from utils.video_fetcher import sync_videos
 
     def _video_sync_loop():
+        from utils.video_fetcher import cleanup_old_videos
         while True:
             try:
                 sync_videos()
+                cleanup_old_videos()
             except Exception:
                 pass
             _time.sleep(3600)
